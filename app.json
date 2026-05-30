@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.ced04.gazexpressclient"
+      "package": "com.ced04.klikci"
     },
     "web": {
       "favicon": "./assets/favicon.png"
