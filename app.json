@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Klik CI",
-    "slug": "klik-ci-client",
+    "slug": "gazexpress-client",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,8 +32,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "d4a7a56e-bf53-410e-924b-b602653bac25"
-      }
+       }
     },
     "owner": "ced04"
   }
