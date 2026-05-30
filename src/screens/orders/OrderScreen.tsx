@@ -27,11 +27,29 @@ interface OrderScreenProps {
 }
 
 const PAYMENT_METHODS = [
-  { id: 'orange_money', label: 'Orange Money',      color: '#FF6600', bg: '#FFF3EB', logo: require('../../assets/orange.png') },
-  { id: 'wave',         label: 'Wave',               color: '#1877F2', bg: '#EBF2FF', logo: require('../../assets/wave.png') },
-  { id: 'mtn',          label: 'MTN MoMo',           color: '#FFCC00', bg: '#FFFBEB', logo: require('../../assets/mtn.png') },
-  { id: 'cash',         label: 'Espèces au livreur', color: '#0A8C52', bg: '#E8F5EE', logo: null, emoji: '💵' },
-  { id: 'wallet',       label: 'Portefeuille Klik',        color: '#0D1F14', bg: '#F0FAF5', logo: null, emoji: '👛' },
+  {
+    id: 'orange_money',
+    label: 'Orange Money',
+    color: '#FF6600',
+    bg: '#FFF3EB',
+    logo: { uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Orange_Money_Logo.svg/320px-Orange_Money_Logo.svg.png' },
+  },
+  {
+    id: 'wave',
+    label: 'Wave',
+    color: '#1877F2',
+    bg: '#EBF2FF',
+    logo: { uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Wave_logo_2020.svg/320px-Wave_logo_2020.svg.png' },
+  },
+  {
+    id: 'mtn',
+    label: 'MTN MoMo',
+    color: '#FFCC00',
+    bg: '#FFFBEB',
+    logo: { uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/MTN_Logo.svg/320px-MTN_Logo.svg.png' },
+  },
+  { id: 'cash',   label: 'Espèces au livreur', color: '#0A8C52', bg: '#E8F5EE', logo: null, emoji: '💵' },
+  { id: 'wallet', label: 'Portefeuille Klik',  color: '#0D1F14', bg: '#F0FAF5', logo: null, emoji: '👛' },
 ];
 
 export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: OrderScreenProps) {
