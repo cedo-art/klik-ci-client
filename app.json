@@ -32,7 +32,8 @@
     ],
     "extra": {
       "eas": {
-       }
+        "projectId": "d4a7a56e-bf53-410e-924b-b602653bac25"
+      }
     },
     "owner": "ced04"
   }
