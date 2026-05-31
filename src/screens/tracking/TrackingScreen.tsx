@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { deliveryService, ordersService } from '../../services/api';
 
@@ -35,7 +35,6 @@ const STEPS = [
   { label: 'Livrée',             icon: 'checkmark-done-circle' },
 ];
 
-// Coordonnées par défaut (Cocody Abidjan)
 const DEFAULT_DEPOT  = { latitude: 5.4006, longitude: -3.9314 };
 const DEFAULT_CLIENT = { latitude: 5.3750, longitude: -3.9750 };
 const DEFAULT_DRIVER = { latitude: 5.3820, longitude: -3.9820 };
@@ -59,10 +58,10 @@ export default function TrackingScreen({
 }: TrackingScreenProps) {
   const insets = useSafeAreaInsets();
 
-  const [loading, setLoading]         = useState(true);
-  const [delivery, setDelivery]       = useState<any>(null);
-  const [order, setOrder]             = useState<any>(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [loading, setLoading]           = useState(true);
+  const [delivery, setDelivery]         = useState<any>(null);
+  const [order, setOrder]               = useState<any>(null);
+  const [currentStep, setCurrentStep]   = useState(0);
   const [driverCoords, setDriverCoords] = useState(DEFAULT_DRIVER);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -74,7 +73,7 @@ export default function TrackingScreen({
     rapide:   { label: 'Rapide',   color: '#0A8C52', icon: '⚡' },
     express:  { label: 'Express',  color: '#E85200', icon: '🚀' },
   };
-  const modeInfo = MODE_CONFIG[modeLivraison];
+  const modeInfo = MODE_CONFIG[modeLivraison] ?? MODE_CONFIG.rapide;
 
   useEffect(() => {
     Animated.spring(slideUp, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
@@ -97,23 +96,20 @@ export default function TrackingScreen({
     if (!orderId) { setLoading(false); return; }
     try {
       const deliveryRes = await deliveryService.getOrderDelivery(orderId);
-      const d = deliveryRes.data;
+      const d = deliveryRes?.data;
+      if (!d) { setLoading(false); return; }
       setDelivery(d);
       setCurrentStep(STATUS_TO_STEP[d.status] ?? 0);
 
-      // GPS livreur — conversion sécurisée
       if (d.currentLat && d.currentLng) {
         const lat = toNum(d.currentLat, DEFAULT_DRIVER.latitude);
         const lng = toNum(d.currentLng, DEFAULT_DRIVER.longitude);
-        if (lat !== DEFAULT_DRIVER.latitude || lng !== DEFAULT_DRIVER.longitude) {
-          setDriverCoords({ latitude: lat, longitude: lng });
-        }
+        setDriverCoords({ latitude: lat, longitude: lng });
       }
 
-      // Commande — pour station et adresse client
       try {
         const orderRes = await ordersService.getOrderById(orderId);
-        setOrder(orderRes.data);
+        setOrder(orderRes?.data ?? null);
       } catch {}
 
     } catch (err) {
@@ -123,7 +119,6 @@ export default function TrackingScreen({
     }
   };
 
-  // Coordonnées — conversion String → number sécurisée
   const depotCoords = {
     latitude:  toNum(order?.depot?.latitude,  DEFAULT_DEPOT.latitude),
     longitude: toNum(order?.depot?.longitude, DEFAULT_DEPOT.longitude),
@@ -137,13 +132,12 @@ export default function TrackingScreen({
   const centerLat = (depotCoords.latitude + clientCoords.latitude) / 2;
   const centerLng = (depotCoords.longitude + clientCoords.longitude) / 2;
 
-  // Infos affichage
-  const statusKey   = delivery?.status || 'confirmed';
-  const statusLabel = STATUS_LABEL[statusKey] || 'En cours';
-  const stationName = order?.depot?.name || 'Station Klik';
-  const eta         = delivery?.etaMinutes || 20;
-  const driverName  = delivery?.driver?.fullName || delivery?.driver?.phone || 'Livreur Klik';
-  const driverPhone = delivery?.driver?.phone || '';
+  const statusKey     = delivery?.status || 'assigned';
+  const statusLabel   = STATUS_LABEL[statusKey] || 'En cours';
+  const stationName   = order?.depot?.name || 'Station Klik';
+  const eta           = delivery?.etaMinutes || 20;
+  const driverName    = delivery?.driver?.fullName || delivery?.driver?.phone || 'Livreur Klik';
+  const driverPhone   = delivery?.driver?.phone || '';
   const tricyclePlate = delivery?.driver?.tricyclePlate || '—';
 
   if (loading) {
@@ -159,11 +153,10 @@ export default function TrackingScreen({
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* CARTE PLEIN ÉCRAN */}
+      {/* CARTE — sans PROVIDER_GOOGLE pour éviter le crash */}
       <MapView
         ref={mapRef}
         style={s.map}
-        provider={PROVIDER_GOOGLE}
         initialRegion={{
           latitude:       centerLat,
           longitude:      centerLng,
@@ -173,24 +166,18 @@ export default function TrackingScreen({
         showsUserLocation={false}
         showsMyLocationButton={false}
       >
-        {/* Station */}
-        <Marker
-          coordinate={depotCoords}
-          title={stationName}
-        >
+        <Marker coordinate={depotCoords} title={stationName}>
           <View style={s.stationMarker}>
             <Text style={{ fontSize: 14 }}>⛽</Text>
           </View>
         </Marker>
 
-        {/* Client */}
         <Marker coordinate={clientCoords} title="Votre position">
           <View style={s.clientMarker}>
             <Ionicons name="home" size={14} color="#fff" />
           </View>
         </Marker>
 
-        {/* Tricycle — visible seulement si en route */}
         {currentStep >= 1 && (
           <Marker coordinate={driverCoords} title="Tricycle Klik">
             <View style={s.tricycleMarker}>
@@ -236,7 +223,6 @@ export default function TrackingScreen({
         transform: [{ translateY: slideUp }],
       }]}>
 
-        {/* ETA & Status */}
         <View style={s.etaRow}>
           <View style={s.pulseWrap}>
             <Animated.View style={[s.pulseRing, {
@@ -261,13 +247,12 @@ export default function TrackingScreen({
           )}
         </View>
 
-        {/* Steps */}
         <View style={s.stepsRow}>
           {STEPS.map((step, i) => (
             <View key={i} style={s.step}>
               <View style={[
                 s.stepDot,
-                i < currentStep  && s.stepDotDone,
+                i < currentStep   && s.stepDotDone,
                 i === currentStep && s.stepDotActive,
               ]}>
                 {i < currentStep
@@ -283,7 +268,6 @@ export default function TrackingScreen({
           ))}
         </View>
 
-        {/* Livreur */}
         <View style={s.driverCard}>
           <View style={s.driverLeft}>
             <View style={s.driverAvatar}>
@@ -325,8 +309,8 @@ const s = StyleSheet.create({
   backBtn:   { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.md },
   centerBtn: { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.md },
   modeBadge: { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1 },
-  modeBadgeTxt:   { fontSize: 14 },
-  modeBadgeLabel: { fontSize: 12, fontWeight: '700' },
+  modeBadgeTxt:    { fontSize: 14 },
+  modeBadgeLabel:  { fontSize: 12, fontWeight: '700' },
 
   stationMarker:  { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F5A623', ...shadows.sm },
   clientMarker:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
@@ -345,27 +329,27 @@ const s = StyleSheet.create({
   etaNum:   { fontSize: 24, fontWeight: '800', color: '#0A8C52', lineHeight: 26 },
   etaUnit:  { fontSize: 10, color: '#0A8C52', fontWeight: '600' },
 
-  stepsRow:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
-  step:         { flex: 1, alignItems: 'center' },
-  stepDot:      { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E8E6DF', marginBottom: 4 },
-  stepDotDone:  { backgroundColor: '#0A8C52', borderColor: '#0A8C52' },
-  stepDotActive:{ backgroundColor: '#F5A623', borderColor: '#F5A623' },
-  stepInner:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#B4B2A9' },
+  stepsRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
+  step:            { flex: 1, alignItems: 'center' },
+  stepDot:         { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E8E6DF', marginBottom: 4 },
+  stepDotDone:     { backgroundColor: '#0A8C52', borderColor: '#0A8C52' },
+  stepDotActive:   { backgroundColor: '#F5A623', borderColor: '#F5A623' },
+  stepInner:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#B4B2A9' },
   stepInnerActive: { backgroundColor: '#0D1F14' },
-  stepLine:     { position: 'absolute', top: 12, left: '50%', right: '-50%', height: 1.5, backgroundColor: '#E8E6DF' },
-  stepLineDone: { backgroundColor: '#0A8C52' },
-  stepLbl:      { fontSize: 9, color: '#B4B2A9', textAlign: 'center' },
-  stepLblActive:{ color: '#0A8C52', fontWeight: '600' },
+  stepLine:        { position: 'absolute', top: 12, left: '50%', right: '-50%', height: 1.5, backgroundColor: '#E8E6DF' },
+  stepLineDone:    { backgroundColor: '#0A8C52' },
+  stepLbl:         { fontSize: 9, color: '#B4B2A9', textAlign: 'center' },
+  stepLblActive:   { color: '#0A8C52', fontWeight: '600' },
 
-  driverCard:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F4F0', borderRadius: 14, padding: 12 },
-  driverLeft:    { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  driverAvatar:  { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E8E6DF', alignItems: 'center', justifyContent: 'center' },
-  driverDetails: { flex: 1 },
-  driverName:    { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
-  driverVehicle: { fontSize: 11, color: '#888780', marginTop: 2 },
-  ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  ratingTxt:     { fontSize: 11, color: '#F5A623', fontWeight: '600' },
-  driverActions: { flexDirection: 'row', gap: 8 },
-  callBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center' },
-  msgBtn:        { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' },
+  driverCard:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F4F0', borderRadius: 14, padding: 12 },
+  driverLeft:   { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  driverAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E8E6DF', alignItems: 'center', justifyContent: 'center' },
+  driverDetails:{ flex: 1 },
+  driverName:   { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
+  driverVehicle:{ fontSize: 11, color: '#888780', marginTop: 2 },
+  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  ratingTxt:    { fontSize: 11, color: '#F5A623', fontWeight: '600' },
+  driverActions:{ flexDirection: 'row', gap: 8 },
+  callBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center' },
+  msgBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' },
 });

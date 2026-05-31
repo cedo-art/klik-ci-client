@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  TextInput, Modal, Linking,
+  TextInput, Modal, Linking, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,23 +30,49 @@ const COMMUNES = ['Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Abobo', 'Adjamé'
 const LABELS = ['Domicile', 'Bureau', 'Autre'];
 
 const SOS_TYPES = [
-  { id: 'incendie', label: 'Incendie / Explosion gaz', icon: 'flame', color: '#E24B4A', tel: '180', desc: 'Pompiers — Sapeurs-pompiers CI' },
-  { id: 'police', label: 'Vol / Agression', icon: 'shield-outline', color: '#7B3FA0', tel: '110', desc: 'Police secours' },
-  { id: 'samu', label: 'Urgence médicale', icon: 'medical', color: '#1565C0', tel: '185', desc: 'SAMU — Urgences médicales' },
-  { id: 'gendarmerie', label: 'Gendarmerie', icon: 'car-sport', color: '#E8A000', tel: '170', desc: 'Gendarmerie nationale CI' },
+  { id: 'incendie',    label: 'Incendie / Explosion gaz', icon: 'flame',        color: '#E24B4A', tel: '180', desc: 'Pompiers — Sapeurs-pompiers CI' },
+  { id: 'police',      label: 'Vol / Agression',          icon: 'shield-outline',color: '#7B3FA0', tel: '110', desc: 'Police secours' },
+  { id: 'samu',        label: 'Urgence médicale',         icon: 'medical',       color: '#1565C0', tel: '185', desc: 'SAMU — Urgences médicales' },
+  { id: 'gendarmerie', label: 'Gendarmerie',              icon: 'car-sport',     color: '#E8A000', tel: '170', desc: 'Gendarmerie nationale CI' },
 ];
+
+// Mini carte sécurisée — ne crash pas si coords invalides
+function SafeMapView({ lat, lng }: { lat: number; lng: number }) {
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
+  try {
+    return (
+      <MapView
+        style={{ flex: 1 }}
+        region={{ latitude: lat, longitude: lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        pitchEnabled={false}
+        rotateEnabled={false}
+        liteMode={Platform.OS === 'android'}
+      >
+        <Marker coordinate={{ latitude: lat, longitude: lng }}>
+          <View style={s.addrMarker}>
+            <Ionicons name="home" size={12} color="#fff" />
+          </View>
+        </Marker>
+      </MapView>
+    );
+  } catch {
+    return null;
+  }
+}
 
 export default function ProfilScreen({ onClose }: ProfilScreenProps) {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [addresses, setAddresses]       = useState<Address[]>([]);
+  const [loading, setLoading]           = useState(true);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [showSOS, setShowSOS] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [hasKlikPass] = useState(false);
-  const [newAddress, setNewAddress] = useState({ label: 'Domicile', fullAddress: '', commune: 'Cocody' });
+  const [showSOS, setShowSOS]           = useState(false);
+  const [locating, setLocating]         = useState(false);
+  const [mapCoords, setMapCoords]       = useState<{ lat: number; lng: number } | null>(null);
+  const [hasKlikPass]                   = useState(false);
+  const [newAddress, setNewAddress]     = useState({ label: 'Domicile', fullAddress: '', commune: 'Cocody' });
   const [savingAddress, setSavingAddress] = useState(false);
 
   useEffect(() => { loadAddresses(); }, []);
@@ -54,7 +80,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
   const loadAddresses = async () => {
     try {
       const res = await usersService.getAddresses();
-      setAddresses(res.data);
+      setAddresses(res?.data ?? []);
     } catch {
       setAddresses([]);
     } finally {
@@ -66,10 +92,16 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Autorisez la localisation dans les paramètres');
+        return;
+      }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const geocode = await Location.reverseGeocodeAsync({ latitude: location.coords.latitude, longitude: location.coords.longitude });
-      const place = geocode[0];
+      const geocode  = await Location.reverseGeocodeAsync({
+        latitude:  location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      const place   = geocode[0];
       const address = `${place?.street || ''} ${place?.district || place?.subregion || ''}`.trim();
       const commune = place?.city || place?.subregion || 'Abidjan';
       setMapCoords({ lat: location.coords.latitude, lng: location.coords.longitude });
@@ -86,16 +118,23 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
   };
 
   const handleAddAddress = async () => {
-    if (!newAddress.fullAddress.trim()) { Alert.alert('Erreur', 'Veuillez entrer une adresse'); return; }
+    if (!newAddress.fullAddress.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer une adresse');
+      return;
+    }
     setSavingAddress(true);
     try {
-      await usersService.createAddress(newAddress);
+      await usersService.createAddress({
+        ...newAddress,
+        latitude:  mapCoords?.lat,
+        longitude: mapCoords?.lng,
+      });
       await loadAddresses();
       setShowAddAddress(false);
       setMapCoords(null);
       setNewAddress({ label: 'Domicile', fullAddress: '', commune: 'Cocody' });
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'ajouter l\'adresse');
+      Alert.alert('Erreur', "Impossible d'ajouter l'adresse");
     } finally {
       setSavingAddress(false);
     }
@@ -117,15 +156,12 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
   const handleSOS = (type: typeof SOS_TYPES[0]) => {
     Alert.alert(
       `🚨 Appeler le ${type.label} ?`,
-      `Vous allez appeler le ${type.tel} (${type.desc}).\n\nVotre position GPS sera communiquée aux secours.`,
+      `Vous allez appeler le ${type.tel} (${type.desc}).`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: `Appeler le ${type.tel}`, style: 'destructive',
-          onPress: () => {
-            setShowSOS(false);
-            Linking.openURL(`tel:${type.tel}`);
-          },
+          onPress: () => { setShowSOS(false); Linking.openURL(`tel:${type.tel}`); },
         },
       ]
     );
@@ -147,7 +183,6 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Mon profil</Text>
-        {/* BOUTON SOS */}
         <TouchableOpacity style={s.sosHeaderBtn} onPress={() => setShowSOS(true)}>
           <Ionicons name="warning" size={16} color="#fff" />
           <Text style={s.sosHeaderTxt}>SOS</Text>
@@ -259,57 +294,42 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
               </TouchableOpacity>
             </View>
           ) : (
-            addresses.map((addr) => (
-              <View key={addr.id} style={s.addressCard}>
-                {addr.latitude && addr.longitude && (
-                  <View style={s.addrMapWrap}>
-                    <MapView
-                      style={s.addrMap}
-                      region={{
-                        latitude: parseFloat(String(addr.latitude)),
-                        longitude: parseFloat(String(addr.longitude)),
-                        latitudeDelta: 0.008,
-                        longitudeDelta: 0.008,
-                      }}
-                      scrollEnabled={false}
-                      zoomEnabled={false}
-                    >
-                      <Marker coordinate={{
-                        latitude: parseFloat(String(addr.latitude)),
-                        longitude: parseFloat(String(addr.longitude)),
-                      }}>
-                        <View style={s.addrMarker}>
-                          <Ionicons name="home" size={12} color="#fff" />
-                        </View>
-                      </Marker>
-                    </MapView>
-                  </View>
-                )}
-                <View style={s.addressBody}>
-                  <View style={s.addressIcon}>
-                    <Ionicons
-                      name={addr.label === 'Domicile' ? 'home' : addr.label === 'Bureau' ? 'business' : 'location'}
-                      size={20} color="#0A8C52"
-                    />
-                  </View>
-                  <View style={s.addressInfo}>
-                    <View style={s.addressTop}>
-                      <Text style={s.addressLabel}>{addr.label}</Text>
-                      {addr.isDefault && (
-                        <View style={s.defaultBadge}>
-                          <Text style={s.defaultBadgeTxt}>Par défaut</Text>
-                        </View>
-                      )}
+            addresses.map((addr) => {
+              const lat = parseFloat(String(addr.latitude));
+              const lng = parseFloat(String(addr.longitude));
+              return (
+                <View key={addr.id} style={s.addressCard}>
+                  {!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && (
+                    <View style={s.addrMapWrap}>
+                      <SafeMapView lat={lat} lng={lng} />
                     </View>
-                    <Text style={s.addressFull}>{addr.fullAddress}</Text>
-                    <Text style={s.addressCommune}>{addr.commune}</Text>
+                  )}
+                  <View style={s.addressBody}>
+                    <View style={s.addressIcon}>
+                      <Ionicons
+                        name={addr.label === 'Domicile' ? 'home' : addr.label === 'Bureau' ? 'business' : 'location'}
+                        size={20} color="#0A8C52"
+                      />
+                    </View>
+                    <View style={s.addressInfo}>
+                      <View style={s.addressTop}>
+                        <Text style={s.addressLabel}>{addr.label}</Text>
+                        {addr.isDefault && (
+                          <View style={s.defaultBadge}>
+                            <Text style={s.defaultBadgeTxt}>Par défaut</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.addressFull}>{addr.fullAddress}</Text>
+                      <Text style={s.addressCommune}>{addr.commune}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteAddress(addr.id)} style={s.deleteBtn}>
+                      <Ionicons name="trash-outline" size={18} color="#E24B4A" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => handleDeleteAddress(addr.id)} style={s.deleteBtn}>
-                    <Ionicons name="trash-outline" size={18} color="#E24B4A" />
-                  </TouchableOpacity>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
@@ -317,11 +337,11 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Paramètres</Text>
           {[
-            { icon: 'wallet-outline', label: 'Mon Portefeuille', sub: '0 FCFA disponible', color: '#0A8C52' },
-            { icon: 'notifications-outline', label: 'Notifications', sub: 'Activées', color: '#1565C0' },
-            { icon: 'shield-checkmark-outline', label: 'Confidentialité', sub: 'Gérer mes données', color: '#7B3FA0' },
-            { icon: 'help-circle-outline', label: 'Aide & Support', sub: 'FAQ, Contact', color: '#E8A000' },
-            { icon: 'star-outline', label: 'Noter l\'app', sub: 'Donnez votre avis', color: '#F5A623' },
+            { icon: 'wallet-outline',           label: 'Mon Portefeuille',  sub: '0 FCFA disponible',  color: '#0A8C52' },
+            { icon: 'notifications-outline',    label: 'Notifications',     sub: 'Activées',            color: '#1565C0' },
+            { icon: 'shield-checkmark-outline', label: 'Confidentialité',   sub: 'Gérer mes données',   color: '#7B3FA0' },
+            { icon: 'help-circle-outline',      label: 'Aide & Support',    sub: 'FAQ, Contact',        color: '#E8A000' },
+            { icon: 'star-outline',             label: "Noter l'app",       sub: 'Donnez votre avis',   color: '#F5A623' },
           ].map((item, i) => (
             <TouchableOpacity key={i} style={s.menuItem} activeOpacity={0.7}>
               <View style={[s.menuIcon, { backgroundColor: `${item.color}20` }]}>
@@ -362,7 +382,6 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
                 <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
-
             <View style={s.sosBody}>
               {SOS_TYPES.map(type => (
                 <TouchableOpacity
@@ -383,11 +402,10 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
                   </View>
                 </TouchableOpacity>
               ))}
-
               <View style={s.sosWarning}>
                 <Ionicons name="information-circle" size={14} color="#E24B4A" />
                 <Text style={s.sosWarningTxt}>
-                  Utilisez uniquement en cas de réelle urgence. Votre position GPS sera communiquée aux secours.
+                  Utilisez uniquement en cas de réelle urgence.
                 </Text>
               </View>
             </View>
@@ -424,23 +442,16 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
             </View>
 
             <TouchableOpacity style={s.geoBtn} onPress={useCurrentLocation} disabled={locating}>
-              {locating ? <ActivityIndicator size="small" color="#0A8C52" /> : <Ionicons name="navigate" size={18} color="#0A8C52" />}
+              {locating
+                ? <ActivityIndicator size="small" color="#0A8C52" />
+                : <Ionicons name="navigate" size={18} color="#0A8C52" />
+              }
               <Text style={s.geoBtnTxt}>{locating ? 'Détection...' : 'Utiliser ma position actuelle'}</Text>
             </TouchableOpacity>
 
             {mapCoords && (
               <View style={s.miniMapWrap}>
-                <MapView
-                  style={s.miniMap}
-                  region={{ latitude: mapCoords.lat, longitude: mapCoords.lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }}
-                  scrollEnabled={false} zoomEnabled={false}
-                >
-                  <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lng }}>
-                    <View style={s.miniMarker}>
-                      <Ionicons name="home" size={14} color="#fff" />
-                    </View>
-                  </Marker>
-                </MapView>
+                <SafeMapView lat={mapCoords.lat} lng={mapCoords.lng} />
               </View>
             )}
 
@@ -470,7 +481,10 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
             </ScrollView>
 
             <TouchableOpacity style={[s.saveBtn, savingAddress && { opacity: 0.7 }]} onPress={handleAddAddress} disabled={savingAddress}>
-              {savingAddress ? <ActivityIndicator color="#0D1F14" /> : <Text style={s.saveBtnTxt}>Enregistrer l'adresse</Text>}
+              {savingAddress
+                ? <ActivityIndicator color="#0D1F14" />
+                : <Text style={s.saveBtnTxt}>Enregistrer l'adresse</Text>
+              }
             </TouchableOpacity>
           </View>
         </View>
@@ -484,11 +498,11 @@ const s = StyleSheet.create({
   scroll:  { flex: 1 },
   content: { padding: 16 },
 
-  header:        { backgroundColor: '#0D1F14', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  backBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:   { fontSize: 17, fontWeight: '700', color: '#fff' },
-  sosHeaderBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E24B4A', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  sosHeaderTxt:  { fontSize: 12, fontWeight: '800', color: '#fff' },
+  header:       { backgroundColor: '#0D1F14', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  backBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 17, fontWeight: '700', color: '#fff' },
+  sosHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E24B4A', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  sosHeaderTxt: { fontSize: 12, fontWeight: '800', color: '#fff' },
 
   profileCard:  { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12, ...shadows.sm },
   avatar:       { width: 60, height: 60, borderRadius: 30, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center' },
@@ -506,7 +520,6 @@ const s = StyleSheet.create({
   statLbl:     { fontSize: 11, color: '#888780', marginTop: 2 },
   statDivider: { width: 1, backgroundColor: '#E8E6DF', marginHorizontal: 8 },
 
-  // KLIKPASS
   klikpassBanner:      { backgroundColor: '#0D1F14', borderRadius: 16, padding: 16, marginBottom: 20, ...shadows.md },
   klikpassBannerTop:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   klikpassIcon:        { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1B3A2D', alignItems: 'center', justifyContent: 'center' },
@@ -535,16 +548,15 @@ const s = StyleSheet.create({
   addFirstBtn:    { backgroundColor: '#0A8C52', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, marginTop: 8 },
   addFirstBtnTxt: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  addressCard:   { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, overflow: 'hidden', ...shadows.sm },
-  addrMapWrap:   { height: 100, width: '100%' },
-  addrMap:       { flex: 1 },
-  addrMarker:    { width: 28, height: 28, borderRadius: 14, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  addressBody:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  addressIcon:   { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' },
-  addressInfo:   { flex: 1 },
-  addressTop:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  addressLabel:  { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
-  defaultBadge:  { backgroundColor: '#E8F5EE', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  addressCard:  { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, overflow: 'hidden', ...shadows.sm },
+  addrMapWrap:  { height: 100, width: '100%' },
+  addrMarker:   { width: 28, height: 28, borderRadius: 14, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  addressBody:  { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  addressIcon:  { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' },
+  addressInfo:  { flex: 1 },
+  addressTop:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  addressLabel: { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
+  defaultBadge: { backgroundColor: '#E8F5EE', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   defaultBadgeTxt: { fontSize: 10, color: '#0A8C52', fontWeight: '600' },
   addressFull:   { fontSize: 12, color: '#888780' },
   addressCommune:{ fontSize: 11, color: '#B4B2A9', marginTop: 2 },
@@ -560,7 +572,6 @@ const s = StyleSheet.create({
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#FFEBEB', ...shadows.sm },
   logoutTxt: { fontSize: 15, fontWeight: '700', color: '#E24B4A' },
 
-  // SOS MODAL
   sosOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sosModal:       { backgroundColor: '#F5F4F0', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   sosModalHeader: { backgroundColor: '#E24B4A', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -579,7 +590,6 @@ const s = StyleSheet.create({
   sosWarning:     { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#FFEBEB', borderRadius: 10, padding: 10 },
   sosWarningTxt:  { fontSize: 11, color: '#791F1F', flex: 1, lineHeight: 15 },
 
-  // MODAL ADRESSE
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard:    { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
   modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -587,9 +597,9 @@ const s = StyleSheet.create({
   inputLabel:   { fontSize: 13, color: '#888780', marginBottom: 8, fontWeight: '500' },
   labelRow:     { flexDirection: 'row', gap: 10, marginBottom: 16 },
   labelChip:    { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#E8E6DF', backgroundColor: '#fff' },
-  labelChipActive:    { borderColor: '#0A8C52', backgroundColor: '#E8F5EE' },
-  labelChipTxt:       { fontSize: 13, color: '#888780', fontWeight: '500' },
-  labelChipTxtActive: { color: '#0A8C52', fontWeight: '700' },
+  labelChipActive:     { borderColor: '#0A8C52', backgroundColor: '#E8F5EE' },
+  labelChipTxt:        { fontSize: 13, color: '#888780', fontWeight: '500' },
+  labelChipTxtActive:  { color: '#0A8C52', fontWeight: '700' },
   geoBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#0A8C52' },
   geoBtnTxt:    { fontSize: 13, color: '#0A8C52', fontWeight: '600', flex: 1 },
   miniMapWrap:  { borderRadius: 12, overflow: 'hidden', height: 130, marginBottom: 16, ...shadows.sm },
@@ -601,6 +611,6 @@ const s = StyleSheet.create({
   communeChipActive:   { borderColor: '#0A8C52', backgroundColor: '#E8F5EE' },
   communeChipTxt:      { fontSize: 13, color: '#888780', fontWeight: '500' },
   communeChipTxtActive:{ color: '#0A8C52', fontWeight: '700' },
-  saveBtn:      { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center' },
-  saveBtnTxt:   { fontSize: 15, fontWeight: '800', color: '#0D1F14' },
+  saveBtn:    { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center' },
+  saveBtnTxt: { fontSize: 15, fontWeight: '800', color: '#0D1F14' },
 });
