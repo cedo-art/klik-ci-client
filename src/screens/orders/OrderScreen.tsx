@@ -27,9 +27,9 @@ interface OrderScreenProps {
 }
 
 const PAYMENT_METHODS = [
-  { id: 'orange_money', label: 'Orange Money',      color: '#FF6600', bg: '#FFF3EB', logo: require('../assets/orange.jpg') },
- { id: 'wave', label: 'Wave', color: '#1877F2', bg: '#EBF2FF', logo: require('../assets/wave.jpg') },
-  { id: 'mtn',          label: 'MTN MoMo',           color: '#FFCC00', bg: '#FFFBEB', logo: require('../assets/mtn.jpg') },
+  { id: 'orange_money', label: 'Orange Money',      color: '#FF6600', bg: '#FFF3EB', logo: require('../../assets/orange.jpg') },
+ { id: 'wave', label: 'Wave', color: '#1877F2', bg: '#EBF2FF', logo: require('../../assets/wave.jpg') },
+  { id: 'mtn',          label: 'MTN MoMo',           color: '#FFCC00', bg: '#FFFBEB', logo: require('../../assets/mtn.jpg') },
   { id: 'cash',         label: 'Espèces au livreur', color: '#0A8C52', bg: '#E8F5EE', logo: null, emoji: '💵' },
   { id: 'wallet',       label: 'Portefeuille Klik',  color: '#0D1F14', bg: '#F0FAF5', logo: null, emoji: '👛' },
 ];
