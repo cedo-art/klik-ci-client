@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, StatusBar,
-  Image, Modal, ActivityIndicator,
+  Image, Modal, ActivityIndicator,Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,33 +187,37 @@ export default function HomeScreen() {
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.bottlesScroll}>
-            {depotStocks.map((stock) => {
-              const isSelected = selectedStock?.id === stock.id;
-              const color = getBrandColor(stock.product.name);
-              const kg    = parseFloat(stock.product.weightKg);
-              return (
-                <TouchableOpacity key={stock.id} activeOpacity={0.9} onPress={() => setSelectedStock(stock)}>
-                  <View style={[s.bottleCard, isSelected && { borderColor: color, borderWidth: 2.5 }]}>
-                    {isSelected && (
-                      <View style={[s.bottleCheck, { backgroundColor: color }]}>
-                        <Ionicons name="checkmark" size={12} color="#fff" />
-                      </View>
-                    )}
-                    <View style={s.bottleImgWrap}>
-                      <Image source={{ uri: stock.product.imageUrl }} style={s.bottleImg} resizeMode="contain" />
-                    </View>
-                    <Text style={[s.bottleBrand, { color }]}>{stock.product.name.split(' ')[0].toUpperCase()}</Text>
-                    <Text style={s.bottleKg}>{kg} kg</Text>
-                    <Text style={s.bottleDesc}>{getBrandDesc(kg)}</Text>
-                    <Text style={[s.bottlePrice, isSelected && { color }]}>{stock.product.priceFcfa.toLocaleString()} FCFA</Text>
-                    <View style={s.stockBadgeSmall}>
-                      <View style={[s.stockDotSmall, { backgroundColor: stock.quantity > 10 ? '#0A8C52' : '#F5A623' }]} />
-                      <Text style={s.stockTxtSmall}>{stock.quantity} restantes</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+          {depotStocks.map((stock) => {
+  const isSelected = selectedStock?.id === stock.id;
+  const color = getBrandColor(stock.product.name);
+  const kg    = parseFloat(stock.product.weightKg);
+  const logo  = getDepotLogo(selectedDepot);
+  return (
+    <TouchableOpacity key={stock.id} activeOpacity={0.9} onPress={() => setSelectedStock(stock)}>
+      <View style={[s.bottleCard, isSelected && { borderColor: color, borderWidth: 2.5 }]}>
+        {isSelected && (
+          <View style={[s.bottleCheck, { backgroundColor: color }]}>
+            <Ionicons name="checkmark" size={12} color="#fff" />
+          </View>
+        )}
+        {logo && (
+          <Image source={logo} style={{ width: 50, height: 22, marginBottom: 6 }} resizeMode="contain" />
+        )}
+        <View style={s.bottleImgWrap}>
+          <Image source={{ uri: stock.product.imageUrl }} style={s.bottleImg} resizeMode="contain" />
+        </View>
+        <Text style={[s.bottleBrand, { color }]}>{stock.product.name.split(' ')[0].toUpperCase()}</Text>
+        <Text style={s.bottleKg}>{kg} kg</Text>
+        <Text style={s.bottleDesc}>{getBrandDesc(kg)}</Text>
+        <Text style={[s.bottlePrice, isSelected && { color }]}>{stock.product.priceFcfa.toLocaleString()} FCFA</Text>
+        <View style={s.stockBadgeSmall}>
+          <View style={[s.stockDotSmall, { backgroundColor: stock.quantity > 10 ? '#0A8C52' : '#F5A623' }]} />
+          <Text style={s.stockTxtSmall}>{stock.quantity} restantes</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+})}
 
             {otherStocks.length > 0 && (
               <View style={s.arrowSep}>
