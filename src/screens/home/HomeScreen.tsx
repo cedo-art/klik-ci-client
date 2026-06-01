@@ -126,7 +126,9 @@ export default function HomeScreen() {
   const otherStocks   = allStocks.filter(s => s.depot.id !== selectedDepot?.id);
 
   const getDepotLogo = (depot: any) =>
-    depot?.logoUrl ? { uri: `${API_URL}${depot.logoUrl}` } : null;
+  depot?.logoUrl
+    ? { uri: depot.logoUrl.startsWith('http') ? depot.logoUrl : `${API_URL}${depot.logoUrl}` }
+    : null;
 
   return (
     <View style={s.root}>
@@ -385,7 +387,13 @@ export default function HomeScreen() {
             <TouchableOpacity key={i} style={s.tab} activeOpacity={0.7}
               onPress={() => {
                 if (i === 1) setShowHistorique(true);
-                else if (i === 2) setShowTracking(true);
+                else if (i === 2) {
+                  if (lastOrderId) {
+                    setShowTracking(true);
+                  } else {
+                    setShowHistorique(true); // redirige vers historique
+                  }
+                }
                 else if (i === 3) setShowProfil(true);
                 else setActiveTab(i);
               }}

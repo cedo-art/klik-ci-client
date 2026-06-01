@@ -153,7 +153,10 @@ export default function TrackingScreen({
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* CARTE — sans PROVIDER_GOOGLE pour éviter le crash */}
+  // Remplace tout le bloc MapView par ceci
+{(() => {
+  try {
+    return (
       <MapView
         ref={mapRef}
         style={s.map}
@@ -171,13 +174,11 @@ export default function TrackingScreen({
             <Text style={{ fontSize: 14 }}>⛽</Text>
           </View>
         </Marker>
-
         <Marker coordinate={clientCoords} title="Votre position">
           <View style={s.clientMarker}>
             <Ionicons name="home" size={14} color="#fff" />
           </View>
         </Marker>
-
         {currentStep >= 1 && (
           <Marker coordinate={driverCoords} title="Tricycle Klik">
             <View style={s.tricycleMarker}>
@@ -185,7 +186,6 @@ export default function TrackingScreen({
             </View>
           </Marker>
         )}
-
         <Polyline
           coordinates={[depotCoords, driverCoords, clientCoords]}
           strokeColor="#0A8C52"
@@ -193,6 +193,17 @@ export default function TrackingScreen({
           lineDashPattern={[8, 4]}
         />
       </MapView>
+    );
+  } catch {
+    return (
+      <View style={[s.map, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ fontSize: 40 }}>🗺️</Text>
+        <Text style={{ color: '#0A8C52', fontWeight: '700', marginTop: 8 }}>Suivi en cours</Text>
+        <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>{stationName}</Text>
+      </View>
+    );
+  }
+})()}
 
       {/* BOUTON RETOUR */}
       <TouchableOpacity style={[s.backBtn, { top: insets.top + 10 }]} onPress={onClose}>
