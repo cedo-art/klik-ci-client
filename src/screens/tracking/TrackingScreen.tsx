@@ -2,11 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, Animated, StatusBar,
-  Linking, ActivityIndicator,
+  Linking, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { deliveryService, ordersService } from '../../services/api';
 
@@ -35,16 +34,6 @@ const STEPS = [
   { label: 'Livrée',             icon: 'checkmark-done-circle' },
 ];
 
-const DEFAULT_DEPOT  = { latitude: 5.4006, longitude: -3.9314 };
-const DEFAULT_CLIENT = { latitude: 5.3750, longitude: -3.9750 };
-const DEFAULT_DRIVER = { latitude: 5.3820, longitude: -3.9820 };
-
-const toNum = (val: any, fallback: number): number => {
-  if (val === null || val === undefined || val === '') return fallback;
-  const n = parseFloat(String(val));
-  return isNaN(n) ? fallback : n;
-};
-
 interface TrackingScreenProps {
   orderId?:       string | null;
   modeLivraison?: 'standard' | 'rapide' | 'express';
@@ -62,11 +51,9 @@ export default function TrackingScreen({
   const [delivery, setDelivery]         = useState<any>(null);
   const [order, setOrder]               = useState<any>(null);
   const [currentStep, setCurrentStep]   = useState(0);
-  const [driverCoords, setDriverCoords] = useState(DEFAULT_DRIVER);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideUp   = useRef(new Animated.Value(300)).current;
-  const mapRef    = useRef<MapView>(null);
 
   const MODE_CONFIG = {
     standard: { label: 'Standard', color: '#888780', icon: '⏱' },
@@ -101,12 +88,6 @@ export default function TrackingScreen({
       setDelivery(d);
       setCurrentStep(STATUS_TO_STEP[d.status] ?? 0);
 
-      if (d.currentLat && d.currentLng) {
-        const lat = toNum(d.currentLat, DEFAULT_DRIVER.latitude);
-        const lng = toNum(d.currentLng, DEFAULT_DRIVER.longitude);
-        setDriverCoords({ latitude: lat, longitude: lng });
-      }
-
       try {
         const orderRes = await ordersService.getOrderById(orderId);
         setOrder(orderRes?.data ?? null);
@@ -119,19 +100,6 @@ export default function TrackingScreen({
     }
   };
 
-  const depotCoords = {
-    latitude:  toNum(order?.depot?.latitude,  DEFAULT_DEPOT.latitude),
-    longitude: toNum(order?.depot?.longitude, DEFAULT_DEPOT.longitude),
-  };
-
-  const clientCoords = {
-    latitude:  toNum(order?.deliveryAddress?.latitude,  DEFAULT_CLIENT.latitude),
-    longitude: toNum(order?.deliveryAddress?.longitude, DEFAULT_CLIENT.longitude),
-  };
-
-  const centerLat = (depotCoords.latitude + clientCoords.latitude) / 2;
-  const centerLng = (depotCoords.longitude + clientCoords.longitude) / 2;
-
   const statusKey     = delivery?.status || 'assigned';
   const statusLabel   = STATUS_LABEL[statusKey] || 'En cours';
   const stationName   = order?.depot?.name || 'Station Klik';
@@ -142,7 +110,7 @@ export default function TrackingScreen({
 
   if (loading) {
     return (
-      <View style={[s.root, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[s.root, { justifyContent: 'center', alignItems: 'center', paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#0A8C52" />
         <Text style={{ marginTop: 12, color: '#888', fontSize: 13 }}>Chargement du suivi…</Text>
       </View>
@@ -150,91 +118,25 @@ export default function TrackingScreen({
   }
 
   return (
-    <View style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-  // Remplace tout le bloc MapView par ceci
-{(() => {
-  try {
-    return (
-      <MapView
-        ref={mapRef}
-        style={s.map}
-        initialRegion={{
-          latitude:       centerLat,
-          longitude:      centerLng,
-          latitudeDelta:  0.05,
-          longitudeDelta: 0.05,
-        }}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-      >
-        <Marker coordinate={depotCoords} title={stationName}>
-          <View style={s.stationMarker}>
-            <Text style={{ fontSize: 14 }}>⛽</Text>
-          </View>
-        </Marker>
-        <Marker coordinate={clientCoords} title="Votre position">
-          <View style={s.clientMarker}>
-            <Ionicons name="home" size={14} color="#fff" />
-          </View>
-        </Marker>
-        {currentStep >= 1 && (
-          <Marker coordinate={driverCoords} title="Tricycle Klik">
-            <View style={s.tricycleMarker}>
-              <Text style={{ fontSize: 20 }}>🛺</Text>
-            </View>
-          </Marker>
-        )}
-        <Polyline
-          coordinates={[depotCoords, driverCoords, clientCoords]}
-          strokeColor="#0A8C52"
-          strokeWidth={3}
-          lineDashPattern={[8, 4]}
-        />
-      </MapView>
-    );
-  } catch {
-    return (
-      <View style={[s.map, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ fontSize: 40 }}>🗺️</Text>
-        <Text style={{ color: '#0A8C52', fontWeight: '700', marginTop: 8 }}>Suivi en cours</Text>
-        <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>{stationName}</Text>
-      </View>
-    );
-  }
-})()}
-
-      {/* BOUTON RETOUR */}
-      <TouchableOpacity style={[s.backBtn, { top: insets.top + 10 }]} onPress={onClose}>
-        <Ionicons name="arrow-back" size={22} color="#0D1F14" />
-      </TouchableOpacity>
-
-      {/* BADGE MODE */}
-      <View style={[s.modeBadge, {
-        top: insets.top + 10,
-        backgroundColor: `${modeInfo.color}20`,
-        borderColor: modeInfo.color,
-      }]}>
-        <Text style={s.modeBadgeTxt}>{modeInfo.icon}</Text>
-        <Text style={[s.modeBadgeLabel, { color: modeInfo.color }]}>{modeInfo.label}</Text>
+      {/* HEADER */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={onClose} style={s.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#0D1F14" />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Suivi de commande</Text>
+        <View style={[s.modeBadge, { backgroundColor: `${modeInfo.color}20` }]}>
+          <Text style={s.modeBadgeTxt}>{modeInfo.icon}</Text>
+          <Text style={[s.modeBadgeLabel, { color: modeInfo.color }]}>{modeInfo.label}</Text>
+        </View>
       </View>
 
-      {/* BOUTON RAFRAÎCHIR */}
-      <TouchableOpacity
-        style={[s.centerBtn, { top: insets.top + 60 }]}
-        onPress={loadDeliveryData}
-      >
-        <Ionicons name="refresh" size={20} color="#0A8C52" />
-      </TouchableOpacity>
+      <ScrollView style={s.scroll} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}>
 
-      {/* CARTE INFO BAS */}
-      <Animated.View style={[s.infoCard, {
-        paddingBottom: insets.bottom + 16,
-        transform: [{ translateY: slideUp }],
-      }]}>
-
-        <View style={s.etaRow}>
+        {/* ETA CARD */}
+        <View style={s.etaCard}>
           <View style={s.pulseWrap}>
             <Animated.View style={[s.pulseRing, {
               transform: [{ scale: pulseAnim }],
@@ -244,7 +146,7 @@ export default function TrackingScreen({
           </View>
           <View style={s.etaInfo}>
             <Text style={s.etaStatus}>{statusLabel}</Text>
-            <Text style={s.etaSub}>{stationName} · Cocody</Text>
+            <Text style={s.etaSub}>{stationName}</Text>
           </View>
           {currentStep < 3 ? (
             <View style={s.etaBadge}>
@@ -258,6 +160,23 @@ export default function TrackingScreen({
           )}
         </View>
 
+        {/* CARTE ILLUSTRATION */}
+        <View style={s.mapPlaceholder}>
+          <Text style={{ fontSize: 48 }}>🛺</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#0D1F14', marginTop: 8 }}>
+            {currentStep === 0 && 'En attente d\'un livreur'}
+            {currentStep === 1 && 'Livreur en route vers la station'}
+            {currentStep === 2 && 'Livreur en route vers vous'}
+            {currentStep === 3 && 'Livraison effectuée !'}
+          </Text>
+          <Text style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{stationName}</Text>
+          <TouchableOpacity style={s.refreshBtn} onPress={loadDeliveryData}>
+            <Ionicons name="refresh" size={16} color="#0A8C52" />
+            <Text style={{ fontSize: 12, color: '#0A8C52', fontWeight: '600' }}>Actualiser</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* STEPS */}
         <View style={s.stepsRow}>
           {STEPS.map((step, i) => (
             <View key={i} style={s.step}>
@@ -279,6 +198,7 @@ export default function TrackingScreen({
           ))}
         </View>
 
+        {/* LIVREUR */}
         <View style={s.driverCard}>
           <View style={s.driverLeft}>
             <View style={s.driverAvatar}>
@@ -308,28 +228,24 @@ export default function TrackingScreen({
             </TouchableOpacity>
           </View>
         </View>
-      </Animated.View>
+
+      </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1 },
-  map:  { flex: 1 },
+  root:   { flex: 1, backgroundColor: '#F5F4F0' },
+  scroll: { flex: 1 },
 
-  backBtn:   { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.md },
-  centerBtn: { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.md },
-  modeBadge: { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1 },
-  modeBadgeTxt:    { fontSize: 14 },
-  modeBadgeLabel:  { fontSize: 12, fontWeight: '700' },
+  header:       { backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, ...shadows.sm },
+  backBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 16, fontWeight: '700', color: '#0D1F14' },
+  modeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  modeBadgeTxt:   { fontSize: 14 },
+  modeBadgeLabel: { fontSize: 12, fontWeight: '700' },
 
-  stationMarker:  { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F5A623', ...shadows.sm },
-  clientMarker:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  tricycleMarker: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.md, borderWidth: 2, borderColor: '#0A8C52' },
-
-  infoCard: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, ...shadows.md },
-
-  etaRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  etaCard:  { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, ...shadows.sm },
   pulseWrap:{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   pulseRing:{ position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: '#0A8C52' },
   pulseDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0A8C52' },
@@ -340,7 +256,10 @@ const s = StyleSheet.create({
   etaNum:   { fontSize: 24, fontWeight: '800', color: '#0A8C52', lineHeight: 26 },
   etaUnit:  { fontSize: 10, color: '#0A8C52', fontWeight: '600' },
 
-  stepsRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
+  mapPlaceholder: { backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 12, ...shadows.sm },
+  refreshBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: '#E8F5EE', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+
+  stepsRow:        { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, ...shadows.sm },
   step:            { flex: 1, alignItems: 'center' },
   stepDot:         { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E8E6DF', marginBottom: 4 },
   stepDotDone:     { backgroundColor: '#0A8C52', borderColor: '#0A8C52' },
@@ -352,7 +271,7 @@ const s = StyleSheet.create({
   stepLbl:         { fontSize: 9, color: '#B4B2A9', textAlign: 'center' },
   stepLblActive:   { color: '#0A8C52', fontWeight: '600' },
 
-  driverCard:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F4F0', borderRadius: 14, padding: 12 },
+  driverCard:   { backgroundColor: '#fff', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...shadows.sm },
   driverLeft:   { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   driverAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E8E6DF', alignItems: 'center', justifyContent: 'center' },
   driverDetails:{ flex: 1 },
