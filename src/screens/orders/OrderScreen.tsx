@@ -7,19 +7,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { ordersService, paymentsService, usersService } from '../../services/api';
 import { MODES_LIVRAISON, ModeLivraison } from '../../types/commande';
 
 interface OrderScreenProps {
-  bottle: {
-    id: string;
-    brand: string;
-    kg: number;
-    price: number;
-    color: string;
-    image: any;
-  };
+  bottle: { id: string; brand: string; kg: number; price: number; color: string; image: any; };
   depotId: string;
   onClose: () => void;
   onSuccess: (orderId: string) => void;
@@ -96,11 +90,7 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
         type: selectedMode,
         items: [{ productId: bottle.id, quantity }],
       });
-      await paymentsService.initiatePayment({
-        orderId: orderRes.data.id,
-        method:  selectedPayment,
-        amount:  total,
-      });
+      await paymentsService.initiatePayment({ orderId: orderRes.data.id, method: selectedPayment, amount: total });
       onSuccess(orderRes.data.id);
     } catch (error: any) {
       Alert.alert('Erreur', error.response?.data?.message || 'Impossible de passer la commande');
@@ -127,10 +117,7 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
         {['Adresse', 'Délai', 'Paiement', 'Confirmation'].map((label, i) => (
           <View key={i} style={s.progressItem}>
             <View style={[s.progressDot, i <= currentStep && s.progressDotActive, i < currentStep && s.progressDotDone]}>
-              {i < currentStep
-                ? <Ionicons name="checkmark" size={11} color="#fff" />
-                : <Text style={[s.progressNum, i <= currentStep && s.progressNumActive]}>{i + 1}</Text>
-              }
+              {i < currentStep ? <Ionicons name="checkmark" size={11} color="#fff" /> : <Text style={[s.progressNum, i <= currentStep && s.progressNumActive]}>{i + 1}</Text>}
             </View>
             <Text style={[s.progressLbl, i <= currentStep && s.progressLblActive]}>{label}</Text>
             {i < 3 && <View style={[s.progressLine, i < currentStep && s.progressLineDone]} />}
@@ -183,20 +170,26 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
               {locating ? <ActivityIndicator size="small" color="#0A8C52" /> : <Ionicons name="navigate" size={20} color="#0A8C52" />}
               <View style={{ flex: 1 }}>
                 <Text style={s.geoBtnTitle}>Utiliser ma position actuelle</Text>
-                <Text style={s.geoBtnSub}>
-                  {selectedAddress?.isCurrentLocation ? `📍 ${selectedAddress.fullAddress}` : 'GPS — détection automatique'}
-                </Text>
+                <Text style={s.geoBtnSub}>{selectedAddress?.isCurrentLocation ? `📍 ${selectedAddress.fullAddress}` : 'GPS — détection automatique'}</Text>
               </View>
               {selectedAddress?.isCurrentLocation && <Ionicons name="checkmark-circle" size={22} color="#0A8C52" />}
             </TouchableOpacity>
 
             {mapCoords && (
-              <View style={[s.mapWrap, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ fontSize: 32 }}>📍</Text>
-                <Text style={{ fontSize: 12, color: '#0A8C52', fontWeight: '600', marginTop: 4 }}>Position détectée</Text>
-                <Text style={{ fontSize: 10, color: '#888', marginTop: 2 }}>
-                  {mapCoords.lat.toFixed(5)}, {mapCoords.lng.toFixed(5)}
-                </Text>
+              <View style={s.mapWrap}>
+                <MapView
+                  style={s.map}
+                  provider={PROVIDER_GOOGLE}
+                  region={{ latitude: mapCoords.lat, longitude: mapCoords.lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                >
+                  <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lng }} title="Votre position">
+                    <View style={s.posMarker}>
+                      <Ionicons name="location" size={20} color="#fff" />
+                    </View>
+                  </Marker>
+                </MapView>
               </View>
             )}
 
@@ -450,7 +443,9 @@ const s = StyleSheet.create({
   geoBtnActive: { borderColor: '#0A8C52' },
   geoBtnTitle: { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
   geoBtnSub: { fontSize: 11, color: '#888780', marginTop: 2 },
-  mapWrap: { marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 120, ...shadows.sm },
+  mapWrap: { marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 160, ...shadows.sm },
+  map: { flex: 1 },
+  posMarker: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   savedLabel: { fontSize: 12, color: '#888780', marginBottom: 8, marginTop: 12 },
   addressCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
   addressCardSelected: { borderColor: '#0A8C52' },

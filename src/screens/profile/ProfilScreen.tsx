@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  TextInput, Modal, Linking,
+  TextInput, Modal, Linking, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { usersService } from '../../services/api';
@@ -16,17 +17,13 @@ interface ProfilScreenProps {
 }
 
 interface Address {
-  id: string;
-  label: string;
-  fullAddress: string;
-  commune: string;
-  isDefault: boolean;
-  latitude?: number;
-  longitude?: number;
+  id: string; label: string; fullAddress: string;
+  commune: string; isDefault: boolean;
+  latitude?: number; longitude?: number;
 }
 
 const COMMUNES = ['Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Abobo', 'Adjamé'];
-const LABELS = ['Domicile', 'Bureau', 'Autre'];
+const LABELS   = ['Domicile', 'Bureau', 'Autre'];
 
 const SOS_TYPES = [
   { id: 'incendie',    label: 'Incendie / Explosion gaz', icon: 'flame',         color: '#E24B4A', tel: '180', desc: 'Pompiers — Sapeurs-pompiers CI' },
@@ -34,6 +31,26 @@ const SOS_TYPES = [
   { id: 'samu',        label: 'Urgence médicale',         icon: 'medical',        color: '#1565C0', tel: '185', desc: 'SAMU — Urgences médicales' },
   { id: 'gendarmerie', label: 'Gendarmerie',              icon: 'car-sport',      color: '#E8A000', tel: '170', desc: 'Gendarmerie nationale CI' },
 ];
+
+function SafeMapView({ lat, lng }: { lat: number; lng: number }) {
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
+  return (
+    <MapView
+      style={{ flex: 1 }}
+      provider={PROVIDER_GOOGLE}
+      region={{ latitude: lat, longitude: lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }}
+      scrollEnabled={false} zoomEnabled={false}
+      pitchEnabled={false} rotateEnabled={false}
+      liteMode={Platform.OS === 'android'}
+    >
+      <Marker coordinate={{ latitude: lat, longitude: lng }}>
+        <View style={s.addrMarker}>
+          <Ionicons name="home" size={12} color="#fff" />
+        </View>
+      </Marker>
+    </MapView>
+  );
+}
 
 export default function ProfilScreen({ onClose }: ProfilScreenProps) {
   const { user, logout } = useAuth();
@@ -54,26 +71,17 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
     try {
       const res = await usersService.getAddresses();
       setAddresses(res?.data ?? []);
-    } catch {
-      setAddresses([]);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setAddresses([]); }
+    finally { setLoading(false); }
   };
 
   const useCurrentLocation = async () => {
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'Autorisez la localisation dans les paramètres');
-        return;
-      }
+      if (status !== 'granted') { Alert.alert('Permission refusée', 'Autorisez la localisation dans les paramètres'); return; }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const geocode  = await Location.reverseGeocodeAsync({
-        latitude:  location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
+      const geocode  = await Location.reverseGeocodeAsync({ latitude: location.coords.latitude, longitude: location.coords.longitude });
       const place   = geocode[0];
       const address = `${place?.street || ''} ${place?.district || place?.subregion || ''}`.trim();
       const commune = place?.city || place?.subregion || 'Abidjan';
@@ -83,58 +91,37 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
         fullAddress: address || 'Position GPS détectée',
         commune: COMMUNES.includes(commune) ? commune : 'Cocody',
       }));
-    } catch {
-      Alert.alert('Erreur', 'Impossible de récupérer la position');
-    } finally {
-      setLocating(false);
-    }
+    } catch { Alert.alert('Erreur', 'Impossible de récupérer la position'); }
+    finally { setLocating(false); }
   };
 
   const handleAddAddress = async () => {
-    if (!newAddress.fullAddress.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer une adresse');
-      return;
-    }
+    if (!newAddress.fullAddress.trim()) { Alert.alert('Erreur', 'Veuillez entrer une adresse'); return; }
     setSavingAddress(true);
     try {
-      await usersService.createAddress({
-        ...newAddress,
-        latitude:  mapCoords?.lat,
-        longitude: mapCoords?.lng,
-      });
+      await usersService.createAddress({ ...newAddress, latitude: mapCoords?.lat, longitude: mapCoords?.lng });
       await loadAddresses();
-      setShowAddAddress(false);
-      setMapCoords(null);
+      setShowAddAddress(false); setMapCoords(null);
       setNewAddress({ label: 'Domicile', fullAddress: '', commune: 'Cocody' });
-    } catch {
-      Alert.alert('Erreur', "Impossible d'ajouter l'adresse");
-    } finally {
-      setSavingAddress(false);
-    }
+    } catch { Alert.alert('Erreur', "Impossible d'ajouter l'adresse"); }
+    finally { setSavingAddress(false); }
   };
 
   const handleDeleteAddress = (id: string) => {
     Alert.alert('Supprimer', 'Voulez-vous vraiment supprimer cette adresse ?', [
       { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Supprimer', style: 'destructive',
-        onPress: async () => {
-          try { await usersService.deleteAddress(id); await loadAddresses(); }
-          catch { Alert.alert('Erreur', 'Impossible de supprimer'); }
-        },
-      },
+      { text: 'Supprimer', style: 'destructive', onPress: async () => {
+        try { await usersService.deleteAddress(id); await loadAddresses(); }
+        catch { Alert.alert('Erreur', 'Impossible de supprimer'); }
+      }},
     ]);
   };
 
   const handleSOS = (type: typeof SOS_TYPES[0]) => {
-    Alert.alert(
-      `🚨 Appeler le ${type.label} ?`,
-      `Vous allez appeler le ${type.tel} (${type.desc}).`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: `Appeler le ${type.tel}`, style: 'destructive', onPress: () => { setShowSOS(false); Linking.openURL(`tel:${type.tel}`); } },
-      ]
-    );
+    Alert.alert(`🚨 Appeler le ${type.label} ?`, `Vous allez appeler le ${type.tel} (${type.desc}).`, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: `Appeler le ${type.tel}`, style: 'destructive', onPress: () => { setShowSOS(false); Linking.openURL(`tel:${type.tel}`); } },
+    ]);
   };
 
   const handleLogout = () => {
@@ -146,7 +133,6 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
-
       <View style={s.header}>
         <TouchableOpacity onPress={onClose} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
@@ -161,9 +147,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
         <View style={s.profileCard}>
-          <View style={s.avatar}>
-            <Text style={s.avatarTxt}>{user?.phone?.slice(-2) || 'K'}</Text>
-          </View>
+          <View style={s.avatar}><Text style={s.avatarTxt}>{user?.phone?.slice(-2) || 'K'}</Text></View>
           <View style={s.profileInfo}>
             <Text style={s.profileName}>{user?.fullName || 'Client Klik'}</Text>
             <Text style={s.profilePhone}>{user?.phone}</Text>
@@ -172,9 +156,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
               <Text style={s.verifiedTxt}>Compte vérifié</Text>
             </View>
           </View>
-          <TouchableOpacity style={s.editBtn}>
-            <Ionicons name="pencil" size={18} color="#0A8C52" />
-          </TouchableOpacity>
+          <TouchableOpacity style={s.editBtn}><Ionicons name="pencil" size={18} color="#0A8C52" /></TouchableOpacity>
         </View>
 
         <View style={s.statsRow}>
@@ -188,10 +170,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
         {hasKlikPass ? (
           <View style={s.klikpassActive}>
             <View style={s.klikpassLeft}>
-              <View style={s.klikpassBadge}>
-                <Ionicons name="flash" size={14} color="#fff" />
-                <Text style={s.klikpassBadgeTxt}>KlikPass Actif</Text>
-              </View>
+              <View style={s.klikpassBadge}><Ionicons name="flash" size={14} color="#fff" /><Text style={s.klikpassBadgeTxt}>KlikPass Actif</Text></View>
               <Text style={s.klikpassRenewal}>Renouvellement le 20 juin 2026</Text>
               <Text style={s.klikpassCount}>12 livraisons ce mois</Text>
             </View>
@@ -201,10 +180,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
           <View style={s.klikpassBanner}>
             <View style={s.klikpassBannerTop}>
               <View style={s.klikpassIcon}><Ionicons name="flash" size={22} color="#F5A623" /></View>
-              <View>
-                <Text style={s.klikpassBannerTitle}>KlikPass</Text>
-                <Text style={s.klikpassBannerPrice}>5 000 F/mois</Text>
-              </View>
+              <View><Text style={s.klikpassBannerTitle}>KlikPass</Text><Text style={s.klikpassBannerPrice}>5 000 F/mois</Text></View>
             </View>
             <View style={s.klikpassFeatures}>
               {['Livraisons illimitées au tarif Standard', 'Priorité sur les courses Express', 'Rappel stock automatique'].map((feat, i) => (
@@ -247,11 +223,8 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
               return (
                 <View key={addr.id} style={s.addressCard}>
                   {!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && (
-                    <View style={[s.addrMapWrap, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ fontSize: 24 }}>📍</Text>
-                      <Text style={{ fontSize: 11, color: '#0A8C52', fontWeight: '600', marginTop: 2 }}>
-                        {lat.toFixed(4)}, {lng.toFixed(4)}
-                      </Text>
+                    <View style={s.addrMapWrap}>
+                      <SafeMapView lat={lat} lng={lng} />
                     </View>
                   )}
                   <View style={s.addressBody}>
@@ -261,9 +234,7 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
                     <View style={s.addressInfo}>
                       <View style={s.addressTop}>
                         <Text style={s.addressLabel}>{addr.label}</Text>
-                        {addr.isDefault && (
-                          <View style={s.defaultBadge}><Text style={s.defaultBadgeTxt}>Par défaut</Text></View>
-                        )}
+                        {addr.isDefault && <View style={s.defaultBadge}><Text style={s.defaultBadgeTxt}>Par défaut</Text></View>}
                       </View>
                       <Text style={s.addressFull}>{addr.fullAddress}</Text>
                       <Text style={s.addressCommune}>{addr.commune}</Text>
@@ -301,12 +272,10 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
         </View>
 
         <Text style={s.version}>Klik CI v1.0.0 — Phase pilote Abidjan</Text>
-
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#E24B4A" />
           <Text style={s.logoutTxt}>Se déconnecter</Text>
         </TouchableOpacity>
-
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -374,24 +343,24 @@ export default function ProfilScreen({ onClose }: ProfilScreenProps) {
             </TouchableOpacity>
 
             {mapCoords && (
-              <View style={[s.miniMapWrap, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ fontSize: 32 }}>📍</Text>
-                <Text style={{ fontSize: 12, color: '#0A8C52', fontWeight: '600', marginTop: 4 }}>Position détectée</Text>
-                <Text style={{ fontSize: 10, color: '#888', marginTop: 2 }}>
-                  {mapCoords.lat.toFixed(5)}, {mapCoords.lng.toFixed(5)}
-                </Text>
+              <View style={s.miniMapWrap}>
+                <MapView
+                  style={{ flex: 1 }}
+                  provider={PROVIDER_GOOGLE}
+                  region={{ latitude: mapCoords.lat, longitude: mapCoords.lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
+                  scrollEnabled={false} zoomEnabled={false}
+                >
+                  <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lng }}>
+                    <View style={s.miniMarker}>
+                      <Ionicons name="location" size={16} color="#fff" />
+                    </View>
+                  </Marker>
+                </MapView>
               </View>
             )}
 
             <Text style={s.inputLabel}>Adresse complète</Text>
-            <TextInput
-              style={s.input}
-              placeholder="Ex: Angré 7ème tranche, Rue des Fleurs"
-              placeholderTextColor="#B4B2A9"
-              value={newAddress.fullAddress}
-              onChangeText={v => setNewAddress(p => ({ ...p, fullAddress: v }))}
-              multiline
-            />
+            <TextInput style={s.input} placeholder="Ex: Angré 7ème tranche, Rue des Fleurs" placeholderTextColor="#B4B2A9" value={newAddress.fullAddress} onChangeText={v => setNewAddress(p => ({ ...p, fullAddress: v }))} multiline />
 
             <Text style={s.inputLabel}>Commune</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
@@ -463,7 +432,8 @@ const s = StyleSheet.create({
   addFirstBtn: { backgroundColor: '#0A8C52', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, marginTop: 8 },
   addFirstBtnTxt: { fontSize: 13, fontWeight: '700', color: '#fff' },
   addressCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, overflow: 'hidden', ...shadows.sm },
-  addrMapWrap: { height: 80, width: '100%' },
+  addrMapWrap: { height: 100, width: '100%' },
+  addrMarker: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   addressBody: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   addressIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' },
   addressInfo: { flex: 1 },
@@ -511,7 +481,8 @@ const s = StyleSheet.create({
   labelChipTxtActive: { color: '#0A8C52', fontWeight: '700' },
   geoBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#0A8C52' },
   geoBtnTxt: { fontSize: 13, color: '#0A8C52', fontWeight: '600', flex: 1 },
-  miniMapWrap: { borderRadius: 12, overflow: 'hidden', height: 110, marginBottom: 16, ...shadows.sm },
+  miniMapWrap: { borderRadius: 12, overflow: 'hidden', height: 130, marginBottom: 16, ...shadows.sm },
+  miniMarker: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#0A8C52', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   input: { backgroundColor: '#F5F4F0', borderRadius: 12, padding: 14, fontSize: 14, color: '#0D1F14', marginBottom: 16, borderWidth: 1, borderColor: '#E8E6DF', minHeight: 60 },
   communeRow: { flexDirection: 'row', gap: 8, paddingRight: 16 },
   communeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#E8E6DF', backgroundColor: '#fff' },
