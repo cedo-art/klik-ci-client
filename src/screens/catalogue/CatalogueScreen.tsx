@@ -9,8 +9,6 @@ import { shadows } from '../../constants/theme';
 import OrderScreen from '../orders/OrderScreen';
 import { catalogService } from '../../services/api';
 
-const BACKOFFICE_URL = 'http://10.254.90.96:4000';
-
 interface CatalogueScreenProps {
   onClose: () => void;
 }
@@ -33,13 +31,22 @@ const getBrandBg = (name: string) => {
   return '#E8F5EE';
 };
 
+// Logo depuis l'URL complète en BD
+const getDepotLogo = (depot: any) => {
+  if (!depot?.logoUrl) return null;
+  const url = depot.logoUrl.startsWith('http')
+    ? depot.logoUrl
+    : `https://klik-ci-backoffice-wine.vercel.app${depot.logoUrl}`;
+  return { uri: url };
+};
+
 export default function CatalogueScreen({ onClose }: CatalogueScreenProps) {
   const insets = useSafeAreaInsets();
-  const [showOrder, setShowOrder]         = useState(false);
-  const [orderData, setOrderData]         = useState<any>(null);
-  const [loading, setLoading]             = useState(true);
-  const [depots, setDepots]               = useState<any[]>([]);
-  const [allStocks, setAllStocks]         = useState<any[]>([]);
+  const [showOrder, setShowOrder]             = useState(false);
+  const [orderData, setOrderData]             = useState<any>(null);
+  const [loading, setLoading]                 = useState(true);
+  const [depots, setDepots]                   = useState<any[]>([]);
+  const [allStocks, setAllStocks]             = useState<any[]>([]);
   const [selectedDepotId, setSelectedDepotId] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, []);
@@ -93,10 +100,6 @@ export default function CatalogueScreen({ onClose }: CatalogueScreenProps) {
     setShowOrder(true);
   };
 
-  // Logo enseigne depuis back-office
-  const getDepotLogo = (depot: any) =>
-    depot?.logoUrl ? { uri: `${BACKOFFICE_URL}${depot.logoUrl}` } : null;
-
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
 
@@ -128,7 +131,6 @@ export default function CatalogueScreen({ onClose }: CatalogueScreenProps) {
                 style={[s.filterChip, isActive && { backgroundColor: color, borderColor: color }]}
                 onPress={() => setSelectedDepotId(isActive ? null : depot.id)}
               >
-                {/* Logo enseigne depuis back-office */}
                 {logo && (
                   <Image source={logo} style={s.filterLogo} resizeMode="contain" />
                 )}
@@ -164,13 +166,14 @@ export default function CatalogueScreen({ onClose }: CatalogueScreenProps) {
               return (
                 <View key={brand} style={s.brandSection}>
 
-                  {/* En-tête enseigne avec logo depuis back-office */}
+                  {/* En-tête enseigne */}
                   <View style={[s.brandHeader, { backgroundColor: bg, borderLeftColor: color }]}>
-                    <View style={s.brandImgWrap}>
+                    {/* Logo enseigne à gauche */}
+                    <View style={s.brandLogoWrap}>
                       {depotLogo ? (
-                        <Image source={depotLogo} style={s.brandImg} resizeMode="contain" />
+                        <Image source={depotLogo} style={s.brandLogo} resizeMode="contain" />
                       ) : (
-                        <Image source={{ uri: firstStock.product.imageUrl }} style={s.brandImg} resizeMode="contain" />
+                        <Text style={{ fontSize: 28 }}>⛽</Text>
                       )}
                     </View>
                     <View style={s.brandInfo}>
@@ -266,16 +269,16 @@ const s = StyleSheet.create({
   filterTxt:        { fontSize: 13, color: '#888780', fontWeight: '500' },
   filterTxtActive:  { color: '#fff', fontWeight: '700' },
 
-  brandSection: { marginBottom: 16 },
-  brandHeader:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderLeftWidth: 4, marginBottom: 8, ...shadows.sm },
-  brandImgWrap: { width: 56, height: 65, alignItems: 'center', justifyContent: 'center' },
-  brandImg:     { width: 52, height: 62 },
-  brandInfo:    { flex: 1 },
-  brandName:    { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
-  brandDepot:   { fontSize: 12, color: '#0D1F14', fontWeight: '600', marginTop: 2 },
-  brandDesc:    { fontSize: 11, color: '#888780', marginTop: 1 },
-  brandBadge:   { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
-  brandBadgeTxt:{ fontSize: 10, fontWeight: '700', color: '#fff' },
+  brandSection:  { marginBottom: 16 },
+  brandHeader:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderLeftWidth: 4, marginBottom: 8, ...shadows.sm },
+  brandLogoWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.sm },
+  brandLogo:     { width: 48, height: 48 },
+  brandInfo:     { flex: 1 },
+  brandName:     { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  brandDepot:    { fontSize: 12, color: '#0D1F14', fontWeight: '600', marginTop: 2 },
+  brandDesc:     { fontSize: 11, color: '#888780', marginTop: 1 },
+  brandBadge:    { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  brandBadgeTxt: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
   bottleRow:     { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, ...shadows.sm },
   bottleLeft:    { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
