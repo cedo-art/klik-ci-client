@@ -38,13 +38,7 @@
     },
     "plugins": [
       "expo-font",
-      "expo-location",
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "AIzaSyDt3IWjkfkQHmedDPKr37T-7s-bhqee84o"
-        }
-      ]
+      "expo-location"
     ],
     "extra": {
       "eas": {
