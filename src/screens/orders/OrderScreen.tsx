@@ -7,7 +7,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { ordersService, paymentsService, usersService } from '../../services/api';
 import { MODES_LIVRAISON, ModeLivraison } from '../../types/commande';
@@ -28,7 +27,7 @@ interface OrderScreenProps {
 
 const PAYMENT_METHODS = [
   { id: 'orange_money', label: 'Orange Money',      color: '#FF6600', bg: '#FFF3EB', logo: require('../../assets/orange.jpg') },
- { id: 'wave', label: 'Wave', color: '#1877F2', bg: '#EBF2FF', logo: require('../../assets/wave.jpg') },
+  { id: 'wave',         label: 'Wave',               color: '#1877F2', bg: '#EBF2FF', logo: require('../../assets/wave.jpg') },
   { id: 'mtn',          label: 'MTN MoMo',           color: '#FFCC00', bg: '#FFFBEB', logo: require('../../assets/mtn.jpg') },
   { id: 'cash',         label: 'Espèces au livreur', color: '#0A8C52', bg: '#E8F5EE', logo: null, emoji: '💵' },
   { id: 'wallet',       label: 'Portefeuille Klik',  color: '#0D1F14', bg: '#F0FAF5', logo: null, emoji: '👛' },
@@ -108,7 +107,7 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
     } finally { setLoading(false); }
   };
 
-  const STEPS    = ['address', 'delivery', 'payment', 'confirm'];
+  const STEPS       = ['address', 'delivery', 'payment', 'confirm'];
   const currentStep = STEPS.indexOf(step);
   const selectedMethod = PAYMENT_METHODS.find(m => m.id === selectedPayment)!;
 
@@ -116,7 +115,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
     <Animated.View style={[s.root, { transform: [{ translateY: slideAnim }] }]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D1F14" />
 
-      {/* HEADER */}
       <View style={[s.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={onClose} style={s.closeBtn}>
           <Ionicons name="close" size={22} color="#fff" />
@@ -125,15 +123,10 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
         <View style={{ width: 40 }} />
       </View>
 
-      {/* PROGRESS 4 ÉTAPES */}
       <View style={s.progress}>
         {['Adresse', 'Délai', 'Paiement', 'Confirmation'].map((label, i) => (
           <View key={i} style={s.progressItem}>
-            <View style={[
-              s.progressDot,
-              i <= currentStep && s.progressDotActive,
-              i < currentStep  && s.progressDotDone,
-            ]}>
+            <View style={[s.progressDot, i <= currentStep && s.progressDotActive, i < currentStep && s.progressDotDone]}>
               {i < currentStep
                 ? <Ionicons name="checkmark" size={11} color="#fff" />
                 : <Text style={[s.progressNum, i <= currentStep && s.progressNumActive]}>{i + 1}</Text>
@@ -147,7 +140,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        {/* RÉSUMÉ BOUTEILLE ATTRACTIF */}
         <View style={s.summaryCard}>
           <View style={[s.summaryImgContainer, { backgroundColor: `${bottle.color}20` }]}>
             <View style={[s.summaryImgGlow, { backgroundColor: `${bottle.color}15` }]} />
@@ -156,7 +148,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
           <View style={s.summaryInfo}>
             <Text style={[s.summaryBrand, { color: bottle.color }]}>{bottle.brand.split(' ')[0].toUpperCase()}</Text>
             <Text style={s.summaryKg}>{bottle.kg} kg</Text>
-          
           </View>
           <View style={s.summaryPrices}>
             <Text style={s.summaryQty}>{quantity > 1 ? `${quantity} × ` : ''}{bottle.price.toLocaleString()} F</Text>
@@ -165,49 +156,31 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
           </View>
         </View>
 
-        {/* ── ÉTAPE 1 : ADRESSE ── */}
         {step === 'address' && (
           <View>
-            {/* QUANTITÉ */}
             <Text style={s.stepTitle}>Quantité</Text>
             <View style={s.qtyCard}>
               <View style={s.qtyLeft}>
                 <Image source={bottle.image} style={s.qtyImg} resizeMode="contain" />
                 <View>
                   <Text style={s.qtyName}>{bottle.brand}</Text>
-                  <Text style={s.qtyKg}> {bottle.price.toLocaleString()} F/u</Text>
+                  <Text style={s.qtyKg}>{bottle.price.toLocaleString()} F/u</Text>
                 </View>
               </View>
               <View style={s.qtyControls}>
-                <TouchableOpacity
-                  style={[s.qtyBtn, quantity <= 1 && s.qtyBtnDisabled]}
-                  onPress={() => setQuantity(q => Math.max(1, q - 1))}
-                  disabled={quantity <= 1}
-                >
+                <TouchableOpacity style={[s.qtyBtn, quantity <= 1 && s.qtyBtnDisabled]} onPress={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}>
                   <Ionicons name="remove" size={18} color={quantity <= 1 ? '#ccc' : '#0D1F14'} />
                 </TouchableOpacity>
                 <Text style={s.qtyNum}>{quantity}</Text>
-                <TouchableOpacity
-                  style={[s.qtyBtn, quantity >= 5 && s.qtyBtnDisabled]}
-                  onPress={() => setQuantity(q => Math.min(5, q + 1))}
-                  disabled={quantity >= 5}
-                >
+                <TouchableOpacity style={[s.qtyBtn, quantity >= 5 && s.qtyBtnDisabled]} onPress={() => setQuantity(q => Math.min(5, q + 1))} disabled={quantity >= 5}>
                   <Ionicons name="add" size={18} color={quantity >= 5 ? '#ccc' : '#0D1F14'} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* ADRESSE */}
             <Text style={[s.stepTitle, { marginTop: 20 }]}>Adresse de livraison</Text>
-            <TouchableOpacity
-              style={[s.geoBtn, selectedAddress?.isCurrentLocation && s.geoBtnActive]}
-              onPress={useCurrentLocation}
-              disabled={locating}
-            >
-              {locating
-                ? <ActivityIndicator size="small" color="#0A8C52" />
-                : <Ionicons name="navigate" size={20} color="#0A8C52" />
-              }
+            <TouchableOpacity style={[s.geoBtn, selectedAddress?.isCurrentLocation && s.geoBtnActive]} onPress={useCurrentLocation} disabled={locating}>
+              {locating ? <ActivityIndicator size="small" color="#0A8C52" /> : <Ionicons name="navigate" size={20} color="#0A8C52" />}
               <View style={{ flex: 1 }}>
                 <Text style={s.geoBtnTitle}>Utiliser ma position actuelle</Text>
                 <Text style={s.geoBtnSub}>
@@ -218,46 +191,35 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
             </TouchableOpacity>
 
             {mapCoords && (
-              <View style={s.mapWrap}>
-                <MapView
-                  style={s.map}
-                  region={{ latitude: mapCoords.lat, longitude: mapCoords.lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
-                  scrollEnabled={false} zoomEnabled={false}
-                >
-                  <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lng }} title="Votre position" />
-                </MapView>
+              <View style={[s.mapWrap, { backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 32 }}>📍</Text>
+                <Text style={{ fontSize: 12, color: '#0A8C52', fontWeight: '600', marginTop: 4 }}>Position détectée</Text>
+                <Text style={{ fontSize: 10, color: '#888', marginTop: 2 }}>
+                  {mapCoords.lat.toFixed(5)}, {mapCoords.lng.toFixed(5)}
+                </Text>
               </View>
             )}
 
-            {loadingAddresses
-              ? <ActivityIndicator color="#0A8C52" style={{ marginTop: 20 }} />
-              : addresses.length > 0 && (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={s.savedLabel}>Adresses enregistrées</Text>
-                  {addresses.map((addr) => (
-                    <TouchableOpacity
-                      key={addr.id}
-                      style={[s.addressCard, selectedAddress?.id === addr.id && s.addressCardSelected]}
-                      onPress={() => { setSelectedAddress(addr); setMapCoords(null); }}
-                    >
-                      <View style={s.addressIcon}>
-                        <Ionicons
-                          name={addr.label === 'Domicile' ? 'home' : addr.label === 'Bureau' ? 'business' : 'location'}
-                          size={20}
-                          color={selectedAddress?.id === addr.id ? '#0A8C52' : '#B4B2A9'}
-                        />
-                      </View>
-                      <View style={s.addressInfo}>
-                        <Text style={s.addressLabel}>{addr.label}</Text>
-                        <Text style={s.addressFull}>{addr.fullAddress}</Text>
-                        <Text style={s.addressCommune}>{addr.commune}</Text>
-                      </View>
-                      {selectedAddress?.id === addr.id && <Ionicons name="checkmark-circle" size={24} color="#0A8C52" />}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )
-            }
+            {loadingAddresses ? (
+              <ActivityIndicator color="#0A8C52" style={{ marginTop: 20 }} />
+            ) : addresses.length > 0 && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={s.savedLabel}>Adresses enregistrées</Text>
+                {addresses.map((addr) => (
+                  <TouchableOpacity key={addr.id} style={[s.addressCard, selectedAddress?.id === addr.id && s.addressCardSelected]} onPress={() => { setSelectedAddress(addr); setMapCoords(null); }}>
+                    <View style={s.addressIcon}>
+                      <Ionicons name={addr.label === 'Domicile' ? 'home' : addr.label === 'Bureau' ? 'business' : 'location'} size={20} color={selectedAddress?.id === addr.id ? '#0A8C52' : '#B4B2A9'} />
+                    </View>
+                    <View style={s.addressInfo}>
+                      <Text style={s.addressLabel}>{addr.label}</Text>
+                      <Text style={s.addressFull}>{addr.fullAddress}</Text>
+                      <Text style={s.addressCommune}>{addr.commune}</Text>
+                    </View>
+                    {selectedAddress?.id === addr.id && <Ionicons name="checkmark-circle" size={24} color="#0A8C52" />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
             <TouchableOpacity style={s.addNewAddress}>
               <Ionicons name="add-circle-outline" size={20} color="#0A8C52" />
               <Text style={s.addNewAddressTxt}>Ajouter une nouvelle adresse</Text>
@@ -269,30 +231,21 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
           </View>
         )}
 
-        {/* ── ÉTAPE 2 : DÉLAI ── */}
         {step === 'delivery' && (
           <View>
             <Text style={s.stepTitle}>Délai de livraison</Text>
             <Text style={s.stepSubtitle}>Choisissez votre mode de livraison</Text>
-
             {MODES_LIVRAISON.map((mode) => {
               const isSelected = selectedMode === mode.mode;
               return (
-                <TouchableOpacity
-                  key={mode.mode}
-                  style={[s.modeCard, isSelected && s.modeCardSelected]}
-                  onPress={() => setSelectedMode(mode.mode)}
-                  activeOpacity={0.85}
-                >
+                <TouchableOpacity key={mode.mode} style={[s.modeCard, isSelected && s.modeCardSelected]} onPress={() => setSelectedMode(mode.mode)} activeOpacity={0.85}>
                   <View style={[s.modeIconWrap, { backgroundColor: isSelected ? '#0A8C52' : '#F5F4F0' }]}>
                     <Text style={s.modeIcon}>{mode.icon}</Text>
                   </View>
                   <View style={s.modeInfo}>
                     <View style={s.modeTopRow}>
                       <Text style={[s.modeLabel, isSelected && { color: '#0A8C52' }]}>{mode.label}</Text>
-                      {mode.mode === 'rapide' && (
-                        <View style={s.popularBadge}><Text style={s.popularTxt}>Populaire</Text></View>
-                      )}
+                      {mode.mode === 'rapide' && <View style={s.popularBadge}><Text style={s.popularTxt}>Populaire</Text></View>}
                     </View>
                     <Text style={s.modeDelai}>{mode.delai}</Text>
                     <Text style={s.modeDesc}>{mode.description}</Text>
@@ -306,7 +259,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
                 </TouchableOpacity>
               );
             })}
-
             <View style={s.priceSummary}>
               <View style={s.priceSummaryRow}>
                 <Text style={s.priceSummaryLbl}>{quantity} × {bottle.brand}</Text>
@@ -319,12 +271,9 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
               <View style={s.priceDivider} />
               <View style={s.priceSummaryRow}>
                 <Text style={[s.priceSummaryLbl, { fontWeight: '700', color: '#0D1F14' }]}>Total</Text>
-                <Text style={[s.priceSummaryVal, { fontWeight: '800', color: bottle.color, fontSize: 18 }]}>
-                  {total.toLocaleString()} FCFA
-                </Text>
+                <Text style={[s.priceSummaryVal, { fontWeight: '800', color: bottle.color, fontSize: 18 }]}>{total.toLocaleString()} FCFA</Text>
               </View>
             </View>
-
             <View style={s.zoneInfo}>
               <Ionicons name="flash" size={16} color="#0A8C52" />
               <Text style={s.zoneInfoTxt}>Votre commande {bottle.brand} sera prise en charge par la station la plus proche</Text>
@@ -332,23 +281,15 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
           </View>
         )}
 
-        {/* ── ÉTAPE 3 : PAIEMENT ── */}
         {step === 'payment' && (
           <View>
             <Text style={s.stepTitle}>Mode de paiement</Text>
             {PAYMENT_METHODS.map((method) => {
               const isSelected = selectedPayment === method.id;
               return (
-                <TouchableOpacity
-                  key={method.id}
-                  style={[s.paymentCard, isSelected && { borderColor: method.color, backgroundColor: method.bg }]}
-                  onPress={() => setSelectedPayment(method.id)}
-                >
+                <TouchableOpacity key={method.id} style={[s.paymentCard, isSelected && { borderColor: method.color, backgroundColor: method.bg }]} onPress={() => setSelectedPayment(method.id)}>
                   <View style={[s.paymentLogoWrap, { backgroundColor: isSelected ? '#fff' : '#F5F4F0' }]}>
-                    {method.logo
-                      ? <Image source={method.logo} style={s.paymentLogoImg} resizeMode="contain" />
-                      : <Text style={s.paymentEmoji}>{method.emoji}</Text>
-                    }
+                    {method.logo ? <Image source={method.logo} style={s.paymentLogoImg} resizeMode="contain" /> : <Text style={s.paymentEmoji}>{method.emoji}</Text>}
                   </View>
                   <Text style={[s.paymentLabel, isSelected && { color: method.color, fontWeight: '700' }]}>{method.label}</Text>
                   <View style={[s.paymentRadio, isSelected && { borderColor: method.color }]}>
@@ -364,22 +305,15 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
           </View>
         )}
 
-        {/* ── ÉTAPE 4 : CONFIRMATION ── */}
         {step === 'confirm' && (
           <View>
             <Text style={s.stepTitle}>Récapitulatif</Text>
             <View style={s.confirmCard}>
-
-              {/* Produit avec nom et capacité en bas */}
               <View style={s.confirmRow}>
                 <Text style={s.confirmLabel}>📦 Produit</Text>
-                <View style={{ alignItems: 'flex-end', flexShrink: 1, marginLeft: 12 }}>
-                  <Text style={s.confirmValue}> {bottle.brand}</Text>
-                  
-                </View>
+                <Text style={s.confirmValue}>{bottle.brand}</Text>
               </View>
               <View style={s.confirmDivider} />
-
               <View style={s.confirmRow}>
                 <Text style={s.confirmLabel}>📍 Adresse</Text>
                 <View style={{ alignItems: 'flex-end', flexShrink: 1, marginLeft: 12 }}>
@@ -388,7 +322,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
                 </View>
               </View>
               <View style={s.confirmDivider} />
-
               <View style={s.confirmRow}>
                 <Text style={s.confirmLabel}>🚴 Mode</Text>
                 <View style={{ alignItems: 'flex-end', flexShrink: 1, marginLeft: 12 }}>
@@ -397,7 +330,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
                 </View>
               </View>
               <View style={s.confirmDivider} />
-
               <View style={s.confirmRow}>
                 <Text style={s.confirmLabel}>💳 Paiement</Text>
                 <View style={s.confirmPayRow}>
@@ -406,10 +338,8 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
                 </View>
               </View>
               <View style={s.confirmDivider} />
-
-              {/* Détail prix */}
               <View style={[s.confirmRow, { paddingVertical: 6 }]}>
-                <Text style={s.confirmLabel}>{quantity} × {bottle.brand} </Text>
+                <Text style={s.confirmLabel}>{quantity} × {bottle.brand}</Text>
                 <Text style={s.confirmValue}>{subtotal.toLocaleString()} F</Text>
               </View>
               <View style={[s.confirmRow, { paddingVertical: 6 }]}>
@@ -417,13 +347,11 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
                 <Text style={s.confirmValue}>{currentMode.priceFcfa.toLocaleString()} F</Text>
               </View>
               <View style={s.confirmDivider} />
-
               <View style={s.confirmRow}>
                 <Text style={[s.confirmLabel, { fontWeight: '700', color: '#0D1F14', fontSize: 15 }]}>Total</Text>
                 <Text style={[s.confirmValue, { fontWeight: '800', color: bottle.color, fontSize: 20 }]}>{total.toLocaleString()} FCFA</Text>
               </View>
             </View>
-
             <View style={s.deliveryInfo}>
               {[
                 { icon: 'bicycle',          txt: `Livreur Klik · ${currentMode.label} ${currentMode.delai}` },
@@ -442,7 +370,6 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FOOTER */}
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
         {step !== 'address' && (
           <TouchableOpacity style={s.backBtn} onPress={() => {
@@ -453,29 +380,22 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
             <Ionicons name="arrow-back" size={20} color="#0D1F14" />
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={[s.nextBtn, loading && { opacity: 0.7 }]}
-          onPress={() => {
-            if (step === 'address') {
-              if (!selectedAddress) { Alert.alert('Adresse requise', 'Sélectionnez ou détectez votre position'); return; }
-              setStep('delivery');
-            } else if (step === 'delivery') {
-              setStep('payment');
-            } else if (step === 'payment') {
-              setStep('confirm');
-            } else {
-              handleOrder();
-            }
-          }}
-          disabled={loading}
-        >
+        <TouchableOpacity style={[s.nextBtn, loading && { opacity: 0.7 }]} onPress={() => {
+          if (step === 'address') {
+            if (!selectedAddress) { Alert.alert('Adresse requise', 'Sélectionnez ou détectez votre position'); return; }
+            setStep('delivery');
+          } else if (step === 'delivery') {
+            setStep('payment');
+          } else if (step === 'payment') {
+            setStep('confirm');
+          } else {
+            handleOrder();
+          }
+        }} disabled={loading}>
           {loading ? <ActivityIndicator color="#0D1F14" /> : (
             <>
               <Text style={s.nextBtnTxt}>
-                {step === 'address'  ? 'Choisir le délai' :
-                 step === 'delivery' ? 'Choisir le paiement' :
-                 step === 'payment'  ? 'Confirmer' :
-                 'Passer la commande 🛵'}
+                {step === 'address' ? 'Choisir le délai' : step === 'delivery' ? 'Choisir le paiement' : step === 'payment' ? 'Confirmer' : 'Passer la commande 🛵'}
               </Text>
               <Ionicons name="arrow-forward" size={18} color="#0D1F14" />
             </>
@@ -487,123 +407,104 @@ export default function OrderScreen({ bottle, depotId, onClose, onSuccess }: Ord
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#F5F4F0' },
-  scroll:  { flex: 1 },
+  root: { flex: 1, backgroundColor: '#F5F4F0' },
+  scroll: { flex: 1 },
   content: { padding: 16 },
-
-  header:      { backgroundColor: '#0D1F14', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14 },
-  closeBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  header: { backgroundColor: '#0D1F14', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14 },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#fff' },
-
-  progress:          { backgroundColor: '#0D1F14', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingBottom: 16, paddingHorizontal: 12 },
-  progressItem:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  progressDot:       { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  progress: { backgroundColor: '#0D1F14', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingBottom: 16, paddingHorizontal: 12 },
+  progressItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  progressDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
   progressDotActive: { backgroundColor: '#F5A623', borderColor: '#F5A623' },
-  progressDotDone:   { backgroundColor: '#0A8C52', borderColor: '#0A8C52' },
-  progressNum:       { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
+  progressDotDone: { backgroundColor: '#0A8C52', borderColor: '#0A8C52' },
+  progressNum: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
   progressNumActive: { color: '#0D1F14' },
-  progressLbl:       { fontSize: 9, color: 'rgba(255,255,255,0.4)' },
+  progressLbl: { fontSize: 9, color: 'rgba(255,255,255,0.4)' },
   progressLblActive: { color: '#fff', fontWeight: '600' },
-  progressLine:      { width: 14, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 2 },
-  progressLineDone:  { backgroundColor: '#0A8C52' },
-
-  // Summary attractif
-  summaryCard:         { backgroundColor: '#0D1F14', borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 20, ...shadows.md, overflow: 'hidden' },
+  progressLine: { width: 14, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 2 },
+  progressLineDone: { backgroundColor: '#0A8C52' },
+  summaryCard: { backgroundColor: '#0D1F14', borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 20, ...shadows.md, overflow: 'hidden' },
   summaryImgContainer: { width: 80, height: 90, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12, position: 'relative' },
-  summaryImgGlow:      { position: 'absolute', width: 70, height: 70, borderRadius: 35, top: 10 },
-  summaryImg:          { width: 72, height: 86, backgroundColor: 'transparent' },
-  summaryInfo:         { flex: 1 },
-  summaryBrand:        { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 },
-  summaryKg:           { fontSize: 28, fontWeight: '900', color: '#fff', lineHeight: 30 },
-  summaryName:         { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 },
-  summaryPrices:       { alignItems: 'flex-end' },
-  summaryQty:          { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
-  summaryDelivery:     { fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 },
-  summaryTotal:        { fontSize: 17, fontWeight: '800', marginTop: 6 },
-
-  stepTitle:    { fontSize: 18, fontWeight: '700', color: '#0D1F14', marginBottom: 12 },
+  summaryImgGlow: { position: 'absolute', width: 70, height: 70, borderRadius: 35, top: 10 },
+  summaryImg: { width: 72, height: 86, backgroundColor: 'transparent' },
+  summaryInfo: { flex: 1 },
+  summaryBrand: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 },
+  summaryKg: { fontSize: 28, fontWeight: '900', color: '#fff', lineHeight: 30 },
+  summaryPrices: { alignItems: 'flex-end' },
+  summaryQty: { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
+  summaryDelivery: { fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 },
+  summaryTotal: { fontSize: 17, fontWeight: '800', marginTop: 6 },
+  stepTitle: { fontSize: 18, fontWeight: '700', color: '#0D1F14', marginBottom: 12 },
   stepSubtitle: { fontSize: 13, color: '#888780', marginBottom: 16 },
-
-  // Quantité
-  qtyCard:        { backgroundColor: '#fff', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, ...shadows.sm },
-  qtyLeft:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  qtyImg:         { width: 44, height: 52, backgroundColor: 'transparent' },
-  qtyName:        { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
-  qtyKg:          { fontSize: 12, color: '#888780', marginTop: 2 },
-  qtyControls:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F4F0', borderRadius: 12, padding: 4 },
-  qtyBtn:         { width: 34, height: 34, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.sm },
+  qtyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, ...shadows.sm },
+  qtyLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  qtyImg: { width: 44, height: 52, backgroundColor: 'transparent' },
+  qtyName: { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
+  qtyKg: { fontSize: 12, color: '#888780', marginTop: 2 },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F4F0', borderRadius: 12, padding: 4 },
+  qtyBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadows.sm },
   qtyBtnDisabled: { opacity: 0.4 },
-  qtyNum:         { fontSize: 18, fontWeight: '800', color: '#0D1F14', minWidth: 24, textAlign: 'center' },
-
-  // Adresse
-  geoBtn:       { backgroundColor: '#fff', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
+  qtyNum: { fontSize: 18, fontWeight: '800', color: '#0D1F14', minWidth: 24, textAlign: 'center' },
+  geoBtn: { backgroundColor: '#fff', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
   geoBtnActive: { borderColor: '#0A8C52' },
-  geoBtnTitle:  { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
-  geoBtnSub:    { fontSize: 11, color: '#888780', marginTop: 2 },
-  mapWrap:      { marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 160, ...shadows.sm },
-  map:          { flex: 1 },
-  savedLabel:   { fontSize: 12, color: '#888780', marginBottom: 8, marginTop: 12 },
-  addressCard:         { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
+  geoBtnTitle: { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
+  geoBtnSub: { fontSize: 11, color: '#888780', marginTop: 2 },
+  mapWrap: { marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 120, ...shadows.sm },
+  savedLabel: { fontSize: 12, color: '#888780', marginBottom: 8, marginTop: 12 },
+  addressCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
   addressCardSelected: { borderColor: '#0A8C52' },
-  addressIcon:         { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center' },
-  addressInfo:         { flex: 1 },
-  addressLabel:        { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
-  addressFull:         { fontSize: 12, color: '#888780', marginTop: 2 },
-  addressCommune:      { fontSize: 11, color: '#B4B2A9', marginTop: 1 },
-  addNewAddress:       { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, marginBottom: 8 },
-  addNewAddressTxt:    { fontSize: 14, color: '#0A8C52', fontWeight: '600' },
-  zoneInfo:            { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginTop: 8 },
-  zoneInfoTxt:         { fontSize: 12, color: '#065C35', flex: 1 },
-
-  // Mode livraison
-  modeCard:         { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
+  addressIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center' },
+  addressInfo: { flex: 1 },
+  addressLabel: { fontSize: 14, fontWeight: '700', color: '#0D1F14' },
+  addressFull: { fontSize: 12, color: '#888780', marginTop: 2 },
+  addressCommune: { fontSize: 11, color: '#B4B2A9', marginTop: 1 },
+  addNewAddress: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, marginBottom: 8 },
+  addNewAddressTxt: { fontSize: 14, color: '#0A8C52', fontWeight: '600' },
+  zoneInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginTop: 8 },
+  zoneInfoTxt: { fontSize: 12, color: '#065C35', flex: 1 },
+  modeCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
   modeCardSelected: { borderColor: '#0A8C52', backgroundColor: '#F0FAF5' },
-  modeIconWrap:     { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  modeIcon:         { fontSize: 22 },
-  modeInfo:         { flex: 1 },
-  modeTopRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  modeLabel:        { fontSize: 15, fontWeight: '700', color: '#0D1F14' },
-  popularBadge:     { backgroundColor: '#F5A623', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  popularTxt:       { fontSize: 9, fontWeight: '700', color: '#0D1F14' },
-  modeDelai:        { fontSize: 12, color: '#0A8C52', fontWeight: '600' },
-  modeDesc:         { fontSize: 11, color: '#888780', marginTop: 1 },
-  modePriceWrap:    { alignItems: 'flex-end', gap: 6 },
-  modePrice:        { fontSize: 14, fontWeight: '800', color: '#0D1F14' },
-  modeRadio:        { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#B4B2A9', alignItems: 'center', justifyContent: 'center' },
-  modeRadioInner:   { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0A8C52' },
-
-  priceSummary:    { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 12, ...shadows.sm },
+  modeIconWrap: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  modeIcon: { fontSize: 22 },
+  modeInfo: { flex: 1 },
+  modeTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  modeLabel: { fontSize: 15, fontWeight: '700', color: '#0D1F14' },
+  popularBadge: { backgroundColor: '#F5A623', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  popularTxt: { fontSize: 9, fontWeight: '700', color: '#0D1F14' },
+  modeDelai: { fontSize: 12, color: '#0A8C52', fontWeight: '600' },
+  modeDesc: { fontSize: 11, color: '#888780', marginTop: 1 },
+  modePriceWrap: { alignItems: 'flex-end', gap: 6 },
+  modePrice: { fontSize: 14, fontWeight: '800', color: '#0D1F14' },
+  modeRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#B4B2A9', alignItems: 'center', justifyContent: 'center' },
+  modeRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0A8C52' },
+  priceSummary: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 12, ...shadows.sm },
   priceSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
   priceSummaryLbl: { fontSize: 13, color: '#888780' },
   priceSummaryVal: { fontSize: 13, color: '#0D1F14', fontWeight: '600' },
-  priceDivider:    { height: 0.5, backgroundColor: '#E8E6DF', marginVertical: 4 },
-
-  // Paiement
-  paymentCard:       { backgroundColor: '#fff', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
-  paymentLogoWrap:   { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  paymentLogoImg:    { width: 36, height: 36, borderRadius: 8 },
-  paymentEmoji:      { fontSize: 26 },
-  paymentLabel:      { flex: 1, fontSize: 15, color: '#0D1F14', fontWeight: '500' },
-  paymentRadio:      { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#B4B2A9', alignItems: 'center', justifyContent: 'center' },
+  priceDivider: { height: 0.5, backgroundColor: '#E8E6DF', marginVertical: 4 },
+  paymentCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', ...shadows.sm },
+  paymentLogoWrap: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  paymentLogoImg: { width: 36, height: 36, borderRadius: 8 },
+  paymentEmoji: { fontSize: 26 },
+  paymentLabel: { flex: 1, fontSize: 15, color: '#0D1F14', fontWeight: '500' },
+  paymentRadio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#B4B2A9', alignItems: 'center', justifyContent: 'center' },
   paymentRadioInner: { width: 10, height: 10, borderRadius: 5 },
-  secureNote:        { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginTop: 8 },
-  secureNoteTxt:     { fontSize: 12, color: '#065C35' },
-
-  // Confirmation
-  confirmCard:    { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, ...shadows.sm },
-  confirmRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  confirmLabel:   { fontSize: 13, color: '#888780' },
-  confirmValue:   { fontSize: 13, color: '#0D1F14', fontWeight: '600', textAlign: 'right', flexShrink: 1 },
-  confirmSub:     { fontSize: 11, color: '#B4B2A9', marginTop: 2, textAlign: 'right' },
-  confirmPayRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  secureNote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F5EE', borderRadius: 12, padding: 12, marginTop: 8 },
+  secureNoteTxt: { fontSize: 12, color: '#065C35' },
+  confirmCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, ...shadows.sm },
+  confirmRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  confirmLabel: { fontSize: 13, color: '#888780' },
+  confirmValue: { fontSize: 13, color: '#0D1F14', fontWeight: '600', textAlign: 'right', flexShrink: 1 },
+  confirmSub: { fontSize: 11, color: '#B4B2A9', marginTop: 2, textAlign: 'right' },
+  confirmPayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   confirmPayLogo: { width: 24, height: 24, borderRadius: 4 },
   confirmDivider: { height: 0.5, backgroundColor: '#E8E6DF' },
-  deliveryInfo:    { backgroundColor: '#fff', borderRadius: 16, padding: 16, gap: 12, ...shadows.sm },
+  deliveryInfo: { backgroundColor: '#fff', borderRadius: 16, padding: 16, gap: 12, ...shadows.sm },
   deliveryInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deliveryInfoTxt: { fontSize: 13, color: '#0D1F14' },
-
-  footer:     { backgroundColor: '#fff', borderTopWidth: 0.5, borderTopColor: '#E8E6DF', paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', gap: 10, ...shadows.md },
-  backBtn:    { width: 48, height: 52, borderRadius: 14, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E8E6DF' },
-  nextBtn:    { flex: 1, backgroundColor: '#F5A623', borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  footer: { backgroundColor: '#fff', borderTopWidth: 0.5, borderTopColor: '#E8E6DF', paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', gap: 10, ...shadows.md },
+  backBtn: { width: 48, height: 52, borderRadius: 14, backgroundColor: '#F5F4F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E8E6DF' },
+  nextBtn: { flex: 1, backgroundColor: '#F5A623', borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   nextBtnTxt: { fontSize: 15, fontWeight: '800', color: '#0D1F14' },
 });
