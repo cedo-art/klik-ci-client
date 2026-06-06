@@ -391,11 +391,15 @@ export default function HomeScreen() {
             <TouchableOpacity key={i} style={s.tab} activeOpacity={0.7}
               onPress={() => {
                 if (i === 1) setShowHistorique(true);
-                else if (i === 2) {
+               else if (i === 2) {
                   if (lastOrderId) {
                     setShowTracking(true);
                   } else {
-                    setShowHistorique(true); // redirige vers historique
+                    Alert.alert(
+                      '🛺 Aucune commande en cours',
+                      'Passez une commande pour pouvoir suivre votre livraison en temps réel.',
+                      [{ text: 'OK' }]
+                    );
                   }
                 }
                 else if (i === 3) setShowProfil(true);
