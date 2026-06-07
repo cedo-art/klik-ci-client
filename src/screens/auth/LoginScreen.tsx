@@ -1,12 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView, Image,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
-import { PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../../config/firebase';
 import { useAuth } from '../../hooks/useAuth';
 import axios from 'axios';
 
@@ -17,16 +14,12 @@ const BORDER  = '#E5E5E5';
 const TEXT    = '#1a1a1a';
 const LIGHT   = '#888';
 
-const LOGO_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF';
-
 export default function LoginScreen() {
-  const { loginWithFirebase } = useAuth();
-  const [phone, setPhone]           = useState('');
-  const [otp, setOtp]               = useState('');
-  const [step, setStep]             = useState<'phone' | 'otp'>('phone');
-  const [loading, setLoading]       = useState(false);
-  const [verificationId, setVerificationId] = useState('');
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
+  const { verifyOtp, sendOtp } = useAuth();
+  const [phone, setPhone]   = useState('');
+  const [otp, setOtp]       = useState('');
+  const [step, setStep]     = useState<'phone' | 'otp'>('phone');
+  const [loading, setLoading] = useState(false);
 
   const formatPhone = (number: string) => {
     const cleaned = number.replace(/\D/g, '');
@@ -41,15 +34,15 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const phoneProvider = new PhoneAuthProvider(auth);
-      const id = await phoneProvider.verifyPhoneNumber(
-        formatPhone(phone),
-        recaptchaVerifier.current!
-      );
-      setVerificationId(id);
+      const res = await sendOtp(formatPhone(phone));
+      // En mode dev, le code est retourné par le backend
+      if (res?.debug_code) {
+        Alert.alert('Code OTP (test)', `Votre code : ${res.debug_code}`);
+        setOtp(res.debug_code);
+      }
       setStep('otp');
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur envoi OTP');
+      Alert.alert('Erreur', error.response?.data?.message || 'Erreur envoi OTP');
     } finally {
       setLoading(false);
     }
@@ -62,20 +55,9 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      // Vérifier le code Firebase
-      const credential = PhoneAuthProvider.credential(verificationId, otp);
-      const userCredential = await signInWithCredential(auth, credential);
-      const firebaseToken = await userCredential.user.getIdToken();
-
-      // Envoyer le token au backend NestJS
-      const res = await axios.post(`${API_URL}/auth/firebase`, {
-        firebaseToken,
-        phone: formatPhone(phone),
-      });
-
-      await loginWithFirebase(res.data);
+      await verifyOtp(formatPhone(phone), otp);
     } catch (error: any) {
-      Alert.alert('Erreur', 'Code invalide ou expiré');
+      Alert.alert('Erreur', error.response?.data?.message || 'Code invalide');
     } finally {
       setLoading(false);
     }
@@ -86,18 +68,11 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Recaptcha invisible */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={auth.app.options}
-        attemptInvisibleVerification={true}
-      />
-
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
         <View style={styles.header}>
-          <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>K</Text>
+          <View style={styles.logoWrap}>
+            <Text style={styles.logoLetter}>K</Text>
           </View>
           <Text style={styles.appName}>Klik CI</Text>
           <Text style={styles.tagline}>Livraison de gaz butane à domicile</Text>
@@ -107,7 +82,7 @@ export default function LoginScreen() {
           {step === 'phone' ? (
             <>
               <Text style={styles.title}>Connexion</Text>
-              <Text style={styles.subtitle}>Entrez votre numéro pour recevoir un code SMS</Text>
+              <Text style={styles.subtitle}>Entrez votre numéro pour recevoir un code</Text>
 
               <Text style={styles.label}>Numéro de téléphone</Text>
               <View style={styles.phoneRow}>
@@ -132,7 +107,7 @@ export default function LoginScreen() {
               >
                 {loading
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.buttonText}>📲 Recevoir le code SMS</Text>
+                  : <Text style={styles.buttonText}>📲 Recevoir le code</Text>
                 }
               </TouchableOpacity>
             </>
@@ -140,7 +115,7 @@ export default function LoginScreen() {
             <>
               <Text style={styles.title}>Vérification</Text>
               <Text style={styles.subtitle}>
-                Code SMS envoyé au{'\n'}
+                Code envoyé au{'\n'}
                 <Text style={styles.phoneHighlight}>+225 {phone}</Text>
               </Text>
 
@@ -186,25 +161,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll:    { flexGrow: 1, padding: 24, justifyContent: 'center' },
   header:    { alignItems: 'center', marginBottom: 36 },
-  logoPlaceholder: {
+  logoWrap:  {
     width: 80, height: 80, borderRadius: 20,
     backgroundColor: PRIMARY, alignItems: 'center',
     justifyContent: 'center', marginBottom: 12,
   },
-  logoText:  { fontSize: 40, fontWeight: '900', color: '#fff' },
-  appName:   { fontSize: 28, fontWeight: '900', color: PRIMARY, marginBottom: 4 },
-  tagline:   { fontSize: 14, color: LIGHT, textAlign: 'center' },
-  form:      {},
-  title:     { fontSize: 26, fontWeight: 'bold', color: TEXT, marginBottom: 6 },
-  subtitle:  { fontSize: 14, color: LIGHT, marginBottom: 24, lineHeight: 20 },
-  label:     { fontSize: 13, color: LIGHT, marginBottom: 8, fontWeight: '600' },
-  phoneRow:  { flexDirection: 'row', marginBottom: 16, gap: 10 },
-  flag:      {
+  logoLetter: { fontSize: 44, fontWeight: '900', color: '#fff' },
+  appName:    { fontSize: 28, fontWeight: '900', color: PRIMARY, marginBottom: 4 },
+  tagline:    { fontSize: 14, color: LIGHT, textAlign: 'center' },
+  form:       {},
+  title:      { fontSize: 26, fontWeight: 'bold', color: TEXT, marginBottom: 6 },
+  subtitle:   { fontSize: 14, color: LIGHT, marginBottom: 24, lineHeight: 20 },
+  label:      { fontSize: 13, color: LIGHT, marginBottom: 8, fontWeight: '600' },
+  phoneRow:   { flexDirection: 'row', marginBottom: 16, gap: 10 },
+  flag:       {
     backgroundColor: GRAY, borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, justifyContent: 'center',
   },
-  flagText:  { fontSize: 15, color: TEXT, fontWeight: '600' },
+  flagText:   { fontSize: 15, color: TEXT, fontWeight: '600' },
   phoneInput: {
     flex: 1, backgroundColor: GRAY, borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
