@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView,
+  StyleSheet, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, Image, Alert,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
-import axios from 'axios';
 
-const API_URL = 'https://klik-ci-backend-production.up.railway.app';
 const PRIMARY = '#0A8C52';
 const GRAY    = '#F5F5F5';
 const BORDER  = '#E5E5E5';
@@ -16,10 +14,11 @@ const LIGHT   = '#888';
 
 export default function LoginScreen() {
   const { verifyOtp, sendOtp } = useAuth();
-  const [phone, setPhone]   = useState('');
-  const [otp, setOtp]       = useState('');
-  const [step, setStep]     = useState<'phone' | 'otp'>('phone');
-  const [loading, setLoading] = useState(false);
+  const [phone, setPhone]         = useState('');
+  const [otp, setOtp]             = useState('');
+  const [step, setStep]           = useState<'phone' | 'otp'>('phone');
+  const [loading, setLoading]     = useState(false);
+  const [debugCode, setDebugCode] = useState('');
 
   const formatPhone = (number: string) => {
     const cleaned = number.replace(/\D/g, '');
@@ -35,9 +34,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const res = await sendOtp(formatPhone(phone));
-      // En mode dev, le code est retourné par le backend
       if (res?.debug_code) {
-        Alert.alert('Code OTP (test)', `Votre code : ${res.debug_code}`);
+        setDebugCode(res.debug_code);
         setOtp(res.debug_code);
       }
       setStep('otp');
@@ -70,11 +68,13 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
+        {/* HEADER */}
         <View style={styles.header}>
-          <View style={styles.logoWrap}>
-            <Text style={styles.logoLetter}>K</Text>
-          </View>
-          <Text style={styles.appName}>Klik CI</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Livraison de gaz butane à domicile</Text>
         </View>
 
@@ -119,6 +119,15 @@ export default function LoginScreen() {
                 <Text style={styles.phoneHighlight}>+225 {phone}</Text>
               </Text>
 
+              {/* AFFICHAGE DU CODE OTP */}
+              {debugCode ? (
+                <View style={styles.otpDisplay}>
+                  <Text style={styles.otpDisplayLabel}>Votre code de vérification</Text>
+                  <Text style={styles.otpDisplayCode}>{debugCode}</Text>
+                  <Text style={styles.otpDisplayHint}>Code pré-rempli — appuyez sur Valider</Text>
+                </View>
+              ) : null}
+
               <Text style={styles.label}>Code à 6 chiffres</Text>
               <TextInput
                 style={styles.otpInput}
@@ -128,7 +137,7 @@ export default function LoginScreen() {
                 maxLength={6}
                 placeholder="· · · · · ·"
                 placeholderTextColor="#ccc"
-                autoFocus
+                autoFocus={!debugCode}
               />
 
               <TouchableOpacity
@@ -146,7 +155,7 @@ export default function LoginScreen() {
                 <Text style={styles.resendText}>🔄 Renvoyer le code</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.backButton} onPress={() => { setStep('phone'); setOtp(''); }}>
+              <TouchableOpacity style={styles.backButton} onPress={() => { setStep('phone'); setOtp(''); setDebugCode(''); }}>
                 <Text style={styles.backText}>← Changer de numéro</Text>
               </TouchableOpacity>
             </>
@@ -161,20 +170,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll:    { flexGrow: 1, padding: 24, justifyContent: 'center' },
   header:    { alignItems: 'center', marginBottom: 36 },
-  logoWrap:  {
-    width: 80, height: 80, borderRadius: 20,
-    backgroundColor: PRIMARY, alignItems: 'center',
-    justifyContent: 'center', marginBottom: 12,
-  },
-  logoLetter: { fontSize: 44, fontWeight: '900', color: '#fff' },
-  appName:    { fontSize: 28, fontWeight: '900', color: PRIMARY, marginBottom: 4 },
-  tagline:    { fontSize: 14, color: LIGHT, textAlign: 'center' },
-  form:       {},
-  title:      { fontSize: 26, fontWeight: 'bold', color: TEXT, marginBottom: 6 },
-  subtitle:   { fontSize: 14, color: LIGHT, marginBottom: 24, lineHeight: 20 },
-  label:      { fontSize: 13, color: LIGHT, marginBottom: 8, fontWeight: '600' },
-  phoneRow:   { flexDirection: 'row', marginBottom: 16, gap: 10 },
-  flag:       {
+  logo:      { width: 180, height: 100, marginBottom: 10 },
+  tagline:   { fontSize: 14, color: LIGHT, textAlign: 'center' },
+  form:      {},
+  title:     { fontSize: 26, fontWeight: 'bold', color: TEXT, marginBottom: 6 },
+  subtitle:  { fontSize: 14, color: LIGHT, marginBottom: 24, lineHeight: 20 },
+  label:     { fontSize: 13, color: LIGHT, marginBottom: 8, fontWeight: '600' },
+  phoneRow:  { flexDirection: 'row', marginBottom: 16, gap: 10 },
+  flag:      {
     backgroundColor: GRAY, borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, justifyContent: 'center',
@@ -196,6 +199,20 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
   phoneHighlight: { color: PRIMARY, fontWeight: '700' },
+
+  otpDisplay: {
+    backgroundColor: '#E8F5EE',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+  },
+  otpDisplayLabel: { fontSize: 12, color: '#666', marginBottom: 8 },
+  otpDisplayCode:  { fontSize: 40, fontWeight: '900', color: PRIMARY, letterSpacing: 10 },
+  otpDisplayHint:  { fontSize: 11, color: '#888', marginTop: 8 },
+
   otpInput: {
     borderWidth: 2, borderColor: PRIMARY, borderRadius: 14,
     paddingVertical: 18, paddingHorizontal: 16,
