@@ -1,6 +1,9 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/api';
+import axios from 'axios';
+
+const API_URL = 'https://klik-ci-backend-production.up.railway.app';
 
 interface User {
   id: string;
@@ -16,13 +19,14 @@ interface AuthContextType {
   isAuthenticated: boolean;
   sendOtp: (phone: string) => Promise<any>;
   verifyOtp: (phone: string, code: string) => Promise<any>;
+  loginWithFirebase: (data: { accessToken: string; refreshToken: string; user: User }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser]       = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => { checkAuth(); }, []);
@@ -56,6 +60,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return response.data;
   };
 
+  const loginWithFirebase = async (data: { accessToken: string; refreshToken: string; user: User }) => {
+    const { accessToken, refreshToken, user: userData } = data;
+    await AsyncStorage.setItem('accessToken', accessToken);
+    await AsyncStorage.setItem('refreshToken', refreshToken);
+    setUser(userData);
+  };
+
   const logout = async () => {
     await AsyncStorage.removeItem('accessToken');
     await AsyncStorage.removeItem('refreshToken');
@@ -69,6 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       isAuthenticated: !!user,
       sendOtp,
       verifyOtp,
+      loginWithFirebase,
       logout,
     }}>
       {children}

@@ -2,13 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, Animated, StatusBar,
-  Linking, ActivityIndicator, ScrollView,
+  Linking, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { shadows } from '../../constants/theme';
 import { deliveryService, ordersService } from '../../services/api';
+
+const GOOGLE_MAPS_KEY = 'AIzaSyDt3IWjkfkQHmedDPKr37T-7s-bhqee84o';
 
 const STATUS_TO_STEP: Record<string, number> = {
   assigned:        0,
@@ -45,6 +47,21 @@ const toNum = (val: any, fallback: number): number => {
   return isNaN(n) ? fallback : n;
 };
 
+const decodePolyline = (encoded: string) => {
+  let index = 0, lat = 0, lng = 0;
+  const coords: { latitude: number; longitude: number }[] = [];
+  while (index < encoded.length) {
+    let b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return coords;
+};
+
 interface TrackingScreenProps {
   orderId?:       string | null;
   modeLivraison?: 'standard' | 'rapide' | 'express';
@@ -58,6 +75,7 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
   const [order, setOrder]               = useState<any>(null);
   const [currentStep, setCurrentStep]   = useState(0);
   const [driverCoords, setDriverCoords] = useState(DEFAULT_DRIVER);
+  const [routeCoords, setRouteCoords]   = useState<{ latitude: number; longitude: number }[]>([]);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideUp   = useRef(new Animated.Value(300)).current;
@@ -84,6 +102,24 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
     return () => { pulse.stop(); clearInterval(interval); };
   }, [orderId]);
 
+  const fetchRoute = async (
+    origin: { latitude: number; longitude: number },
+    destination: { latitude: number; longitude: number }
+  ) => {
+    try {
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${GOOGLE_MAPS_KEY}`
+      );
+      const data = await res.json();
+      if (data.routes && data.routes.length > 0) {
+        const points = decodePolyline(data.routes[0].overview_polyline.points);
+        setRouteCoords(points);
+      }
+    } catch (e) {
+      console.log('Route error:', e);
+    }
+  };
+
   const loadDeliveryData = async () => {
     if (!orderId) { setLoading(false); return; }
     try {
@@ -92,16 +128,39 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
       if (!d) { setLoading(false); return; }
       setDelivery(d);
       setCurrentStep(STATUS_TO_STEP[d.status] ?? 0);
+
+      let driver = DEFAULT_DRIVER;
       if (d.currentLat && d.currentLng) {
-        setDriverCoords({
+        driver = {
           latitude:  toNum(d.currentLat, DEFAULT_DRIVER.latitude),
           longitude: toNum(d.currentLng, DEFAULT_DRIVER.longitude),
-        });
+        };
+        setDriverCoords(driver);
       }
+
       try {
         const orderRes = await ordersService.getOrderById(orderId);
-        setOrder(orderRes?.data ?? null);
+        const orderData = orderRes?.data ?? null;
+        setOrder(orderData);
+
+        // Récupère l'itinéraire réel
+        const depot = {
+          latitude:  toNum(orderData?.depot?.latitude,  DEFAULT_DEPOT.latitude),
+          longitude: toNum(orderData?.depot?.longitude, DEFAULT_DEPOT.longitude),
+        };
+        const client = {
+          latitude:  toNum(orderData?.deliveryAddress?.latitude,  DEFAULT_CLIENT.latitude),
+          longitude: toNum(orderData?.deliveryAddress?.longitude, DEFAULT_CLIENT.longitude),
+        };
+
+        // Itinéraire selon l'étape
+        if (STATUS_TO_STEP[d.status] <= 1) {
+          await fetchRoute(driver, depot);
+        } else {
+          await fetchRoute(driver, client);
+        }
       } catch {}
+
     } catch (err) {
       console.log('Tracking error:', err);
     } finally {
@@ -120,12 +179,12 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
   const centerLat = (depotCoords.latitude + clientCoords.latitude) / 2;
   const centerLng = (depotCoords.longitude + clientCoords.longitude) / 2;
 
-  const statusKey   = delivery?.status || 'assigned';
-  const statusLabel = STATUS_LABEL[statusKey] || 'En cours';
-  const stationName = order?.depot?.name || 'Station Klik';
-  const eta         = delivery?.etaMinutes || 20;
-  const driverName  = delivery?.driver?.fullName || delivery?.driver?.phone || 'Livreur Klik';
-  const driverPhone = delivery?.driver?.phone || '';
+  const statusKey     = delivery?.status || 'assigned';
+  const statusLabel   = STATUS_LABEL[statusKey] || 'En cours';
+  const stationName   = order?.depot?.name || 'Station Klik';
+  const eta           = delivery?.etaMinutes || 20;
+  const driverName    = delivery?.driver?.fullName || delivery?.driver?.phone || 'Livreur Klik';
+  const driverPhone   = delivery?.driver?.phone || '';
   const tricyclePlate = delivery?.driver?.tricyclePlate || '—';
 
   if (loading) {
@@ -157,18 +216,21 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
         showsTraffic={false}
         showsBuildings={true}
       >
+        {/* Station */}
         <Marker coordinate={depotCoords} title={stationName}>
           <View style={s.stationMarker}>
             <Text style={{ fontSize: 14 }}>⛽</Text>
           </View>
         </Marker>
 
+        {/* Client */}
         <Marker coordinate={clientCoords} title="Votre position">
           <View style={s.clientMarker}>
             <Ionicons name="home" size={14} color="#fff" />
           </View>
         </Marker>
 
+        {/* Livreur */}
         {currentStep >= 1 && (
           <Marker coordinate={driverCoords} title="Tricycle Klik">
             <View style={s.tricycleMarker}>
@@ -177,11 +239,12 @@ export default function TrackingScreen({ orderId, modeLivraison = 'rapide', onCl
           </Marker>
         )}
 
+        {/* Itinéraire réel ou ligne droite en fallback */}
         <Polyline
-          coordinates={[depotCoords, driverCoords, clientCoords]}
+          coordinates={routeCoords.length > 1 ? routeCoords : [depotCoords, driverCoords, clientCoords]}
           strokeColor="#0A8C52"
-          strokeWidth={3}
-          lineDashPattern={[8, 4]}
+          strokeWidth={4}
+          lineDashPattern={routeCoords.length > 1 ? undefined : [8, 4]}
         />
       </MapView>
 
